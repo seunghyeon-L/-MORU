@@ -2,7 +2,7 @@ import { Pressable, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
 export type ChipProps = {
   label: string;
@@ -12,11 +12,15 @@ export type ChipProps = {
   disabled?: boolean;
 };
 
-/** 선택형 UI 전반에서 재사용하는 기본 칩 */
+/** 선택형 UI 전반에서 재사용하는 기본 칩. Figma pill 버튼 기준 */
 export function Chip({ label, selected = false, onPress, disabled }: ChipProps) {
+  const theme = useTheme();
+
   const content = (
-    <ThemedView type={selected ? 'backgroundSelected' : 'backgroundElement'} style={styles.chip}>
-      <ThemedText type="small" themeColor={selected ? 'text' : 'textSecondary'}>
+    <ThemedView
+      type="surfaceCard"
+      style={[styles.chip, { borderColor: selected ? theme.brand : theme.borderSubtle }]}>
+      <ThemedText type="label" themeColor={selected ? 'textPrimary' : 'textSecondary'}>
         {label}
       </ThemedText>
     </ThemedView>
@@ -38,9 +42,10 @@ export function Chip({ label, selected = false, onPress, disabled }: ChipProps) 
 
 const styles = StyleSheet.create({
   chip: {
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.five,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 999,
+    borderWidth: 1,
   },
   dimmed: {
     opacity: 0.6,

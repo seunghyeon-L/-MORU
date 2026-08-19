@@ -43,6 +43,7 @@ export function needsMedicalReferral(flags: readonly SafetyFlag[]): boolean {
 /* ------------------------------------------------------------------ */
 
 export const ALLERGY_OPTIONS = [
+  { id: 'none', label: '없어요' },
   { id: 'milk', label: '우유' },
   { id: 'egg', label: '계란' },
   { id: 'peanut', label: '땅콩' },
@@ -53,6 +54,15 @@ export const ALLERGY_OPTIONS = [
 ] as const satisfies readonly Option<string>[];
 
 export type Allergy = (typeof ALLERGY_OPTIONS)[number]['id'];
+
+/** 셀리악병 진단 여부 (onboarding/allergy, 밀 알레르기 선택 시에만 노출) */
+export const CELIAC_DIAGNOSIS_OPTIONS = [
+  { id: 'no', label: '아니요' },
+  { id: 'yes', label: '네' },
+  { id: 'unknown', label: '모르겠어요' },
+] as const satisfies readonly Option<string>[];
+
+export type CeliacDiagnosis = (typeof CELIAC_DIAGNOSIS_OPTIONS)[number]['id'];
 
 /* ------------------------------------------------------------------ */
 /* 피하고 있는 음식 (onboarding/avoided-food)                           */
@@ -70,6 +80,14 @@ export const AVOIDED_FOOD_OPTIONS = [
   { id: 'carbonated', label: '탄산' },
   { id: 'etc', label: '기타' },
   { id: 'none', label: '없음' },
+  { id: 'bread-snack', label: '빵·과자' },
+  { id: 'cereal', label: '시리얼' },
+  { id: 'apple-pear', label: '사과·배' },
+  { id: 'watermelon', label: '수박' },
+  { id: 'honey-syrup', label: '꿀·시럽' },
+  { id: 'ice-cream', label: '아이스크림' },
+  { id: 'mushroom', label: '버섯' },
+  { id: 'avocado', label: '아보카도' },
 ] as const satisfies readonly Option<string>[];
 
 export type AvoidedFood = (typeof AVOIDED_FOOD_OPTIONS)[number]['id'];
@@ -106,6 +124,8 @@ export type OnboardingData = {
   medicalCheckConfirmed: boolean;
   allergies: Allergy[];
   allergyEtcText?: string;
+  /** 밀 알레르기를 선택했을 때만 의미가 있다 */
+  celiacDiagnosis?: CeliacDiagnosis;
   avoidedFoods: AvoidedFood[];
   avoidedFoodEtcText?: string;
   avoidedReasons: AvoidedReason[];

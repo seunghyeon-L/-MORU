@@ -9,30 +9,29 @@ export type QuestionCardProps = {
   question: string;
   /** 보조 설명. 불안을 높이지 않는 중립적 문구를 사용한다 */
   helperText?: string;
-  /** 복수 선택 가능 여부 안내 */
-  multiple?: boolean;
   children?: ReactNode;
 };
 
-/** 온보딩 한 화면에 들어가는 질문 + 선택지 묶음 */
-export function QuestionCard({ question, helperText, multiple, children }: QuestionCardProps) {
+/**
+ * 온보딩 한 화면에 들어가는 질문 + 선택지 묶음.
+ * 좌우 여백은 화면(screen) 컨테이너가 갖고 있으므로 여기서는 세로 간격만 담당한다.
+ */
+export function QuestionCard({ question, helperText, children }: QuestionCardProps) {
   return (
-    <ThemedView style={styles.container}>
-      <ThemedText type="default">{question}</ThemedText>
+    <ThemedView type="onboardingBackground" style={styles.container}>
+      <ThemedText type="h1" themeColor="textPrimary">
+        {question}
+      </ThemedText>
 
       {helperText ? (
-        <ThemedText type="small" themeColor="textSecondary">
+        <ThemedText type="bodyS" themeColor="textSecondary">
           {helperText}
         </ThemedText>
       ) : null}
 
-      {multiple ? (
-        <ThemedText type="small" themeColor="textSecondary">
-          해당하는 것을 모두 선택해주세요.
-        </ThemedText>
-      ) : null}
-
-      <ThemedView style={styles.options}>{children}</ThemedView>
+      <ThemedView type="onboardingBackground" style={styles.options}>
+        {children}
+      </ThemedView>
     </ThemedView>
   );
 }
@@ -40,11 +39,9 @@ export function QuestionCard({ question, helperText, multiple, children }: Quest
 const styles = StyleSheet.create({
   container: {
     gap: Spacing.two,
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three,
   },
   options: {
     gap: Spacing.two,
-    paddingTop: Spacing.two,
+    paddingTop: Spacing.four,
   },
 });
