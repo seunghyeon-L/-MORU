@@ -13,6 +13,7 @@ import { ThemedView } from '@/components/themed-view';
 import { useTheme } from '@/hooks/use-theme';
 import { useMoruData } from '@/hooks/useMoruData';
 import { Spacing } from '@/constants/theme';
+import * as api from '@/services/api';
 import {
   CONTEXT_FACTOR_OPTIONS,
   DISCOMFORT_LOCATION_OPTIONS,
@@ -22,9 +23,25 @@ import {
   type DiscomfortLocation,
   type Onset,
   type Severity,
+  type SymptomApiLevel,
+  type SymptomApiOnset,
   type SymptomIntensity,
   type SymptomType,
 } from '@/types/symptom';
+
+/** 로컬 UI 값 → POST /symptoms 요청 스키마 값 매핑 */
+const ONSET_TO_API: Record<Onset, SymptomApiOnset> = {
+  'just-now': 'just_now',
+  'hour-ago': 'about_1h',
+  morning: 'since_morning',
+  yesterday: 'since_yesterday',
+};
+
+const INTENSITY_TO_API: Record<SymptomIntensity, SymptomApiLevel> = {
+  none: 'none',
+  mild: 'mild',
+  severe: 'strong',
+};
 
 /** E2 화면에 보여줄 순서 (기타/불규칙한 식사 시간/중요한 일정 제외, Figma 기준) */
 const SITUATION_IDS: ContextFactor[] = [
@@ -79,6 +96,7 @@ export default function SymptomDetailScreen() {
 
   const [step, setStep] = useState<1 | 2>(1);
   const [saving, setSaving] = useState(false);
+  const [postError, setPostError] = useState(false);
 
   // 1단계 state
   const [intensities, setIntensities] = useState<Partial<Record<SymptomType, SymptomIntensity>>>(
@@ -110,12 +128,12 @@ export default function SymptomDetailScreen() {
   const step1Ready = Boolean(onset && location);
   const step2Ready = factors.length > 0;
 
-  /** 온보딩 안전 확인(B1)이 위험 신호를 병원 안내로 넘기는 것과 동일한 패턴 */
+  /**
+   * 위험 신호 여부는 서버(POST /symptoms 의 red_flag)가 판정한다.
+   * 여기서는 값만 담아뒀다가 기록을 마칠 때 함께 보낸다.
+   */
   const handleBloodChange = (checked: boolean) => {
     setHasBloodInStool(checked);
-    if (checked) {
-      router.push('/symptom/medical');
-    }
   };
 
   const handleBack = () => {
@@ -132,30 +150,69 @@ export default function SymptomDetailScreen() {
   };
 
   const handleFinish = async () => {
-    if (!step2Ready || saving) return;
+    if (!step2Ready || saving || !onset || !location) return;
 
+    setPostError(false);
     setSaving(true);
     const now = new Date().toISOString();
     const symptoms = SYMPTOM_CHECK_ITEMS.filter(
       (item) => intensities[item.id] && intensities[item.id] !== 'none',
     ).map((item) => item.id);
+    const contextLabels = factors
+      .filter((factor) => factor !== 'none-change')
+      .flatMap((factor) => {
+        const label = CONTEXT_FACTOR_OPTIONS.find((option) => option.id === factor)?.label;
+        return label ? [label] : [];
+      });
 
-    await addSymptomRecord({
-      id: `symptom-${Date.now()}`,
-      recordedAt: now,
-      state: 'uncomfortable',
-      detail: {
-        symptoms,
-        symptomIntensities: intensities,
-        occurredAt: now,
-        onset,
+    try {
+      const response = await api.logSymptom({
+        details: SYMPTOM_CHECK_ITEMS.map((item) => ({
+          kind: item.label,
+          level: INTENSITY_TO_API[intensities[item.id] ?? 'none'],
+        })),
+        onset: ONSET_TO_API[onset],
         location,
-        hasBloodInStool,
-        severity,
-        contextFactors: factors.filter((factor) => factor !== 'none-change'),
-      },
-    });
-    router.replace('/analysis');
+        blood_in_stool: hasBloodInStool,
+        contexts: contextLabels,
+      });
+
+      // 최근 기록(기록 탭) 표시용 — 서버 저장과 별개로 로컬에도 남겨둔다
+      await addSymptomRecord({
+        id: `symptom-${Date.now()}`,
+        recordedAt: now,
+        state: 'uncomfortable',
+        detail: {
+          symptoms,
+          symptomIntensities: intensities,
+          occurredAt: now,
+          onset,
+          location,
+          hasBloodInStool,
+          severity,
+          contextFactors: factors.filter((factor) => factor !== 'none-change'),
+        },
+      });
+
+      if (response.red_flag && response.notice) {
+        router.push({
+          pathname: '/symptom/medical',
+          params: {
+            title: response.notice.title,
+            body: response.notice.body,
+            footer: response.notice.footer,
+          },
+        });
+      } else {
+        router.replace('/analysis');
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[E1/E2] POST /symptoms failed:', err);
+      setPostError(true);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -259,6 +316,12 @@ export default function SymptomDetailScreen() {
               </ThemedView>
             </>
           )}
+
+          {postError ? (
+            <ThemedText type="bodyS" themeColor="textSecondary" style={styles.errorText}>
+              전송에 실패했어요. 잠시 후 다시 시도해주세요.
+            </ThemedText>
+          ) : null}
         </View>
 
         <BottomButton
@@ -285,6 +348,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: Spacing.four,
     gap: Spacing.three,
+  },
+  errorText: {
+    marginTop: -Spacing.two,
   },
   headerRow: {
     flexDirection: 'row',

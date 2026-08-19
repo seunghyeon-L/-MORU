@@ -13,7 +13,14 @@ import { ThemedView } from '@/components/themed-view';
 import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
 import * as api from '@/services/api';
-import { PORTION_OPTIONS, type FoodItem, type Ingredient, type Portion } from '@/types/food';
+import {
+  PORTION_OPTIONS,
+  type Ingredient,
+  type MealApiMethod,
+  type MealApiPortion,
+  type MealIdentifyResponse,
+  type Portion,
+} from '@/types/food';
 
 /** Figma D2 실제 문구 — 공용 PORTION_OPTIONS 라벨과 달라 이 화면에서만 로컬로 매핑한다 */
 const PORTION_LABELS: Record<Portion, string> = {
@@ -22,10 +29,22 @@ const PORTION_LABELS: Record<Portion, string> = {
   large: '한 그릇 반 이상',
 };
 
+/** portion 값은 API 경계(이 화면)에서만 서버 enum으로 변환한다 */
+const PORTION_API_MAP: Record<Portion, MealApiPortion> = {
+  small: 'half',
+  normal: 'one',
+  large: 'one_and_half_plus',
+};
+
 /**
  * D2 음식 확인 · 재료 확인.
- * 사진/검색으로 추정된 음식의 재료를 사용자가 직접 확인·수정하고
- * 섭취량 · 국물 여부를 남긴다. 저장/API 연동은 아직 하지 않는다.
+ * 사진(POST /meals/identify-photo)/텍스트(POST /meals/identify)로 추정된 음식의 재료를
+ * 사용자가 직접 확인·수정하고, 섭취량·국물 여부와 함께 확인 버튼에서 POST /meals 로 확정한다.
+ *
+ * method(서버 enum: photo|text|search) 는 사진 경로("photo")만 근거가 명확하다.
+ * 텍스트 경로(메뉴 검색/직접 입력)는 현재 food/chat.tsx 에서 mode(search|manual)가
+ * 이 화면까지 전달되지 않고, search/text 중 무엇에 대응하는지도 계약에 없어
+ * POST /meals 호출을 보류한다(BLOCKED) — 확인 버튼이 비활성 상태로 남는다.
  */
 export default function FoodResultScreen() {
   const router = useRouter();
@@ -34,26 +53,37 @@ export default function FoodResultScreen() {
   // photoUri: 카메라(D1)에서 촬영한 사진, foodName: H1(메뉴 검색/직접 입력)에서 입력한 음식명
   const { photoUri, foodName } = useLocalSearchParams<{ photoUri?: string; foodName?: string }>();
 
-  const [foodItem, setFoodItem] = useState<FoodItem | null>(null);
+  const [identify, setIdentify] = useState<MealIdentifyResponse | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [customIngredients, setCustomIngredients] = useState<Ingredient[]>([]);
   const [addingCustom, setAddingCustom] = useState(false);
   const [customText, setCustomText] = useState('');
   const [portion, setPortion] = useState<Portion | undefined>();
   const [hasSoup, setHasSoup] = useState<boolean | undefined>();
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(false);
+
+  /** 사진 경로만 method 를 확정할 수 있다 — 나머지는 BLOCKED (파일 상단 주석 참고) */
+  const method: MealApiMethod | undefined = photoUri ? 'photo' : undefined;
 
   useEffect(() => {
     const load = foodName
-      ? api.searchFoodItems(foodName).then(
-          (matches) => matches[0] ?? { id: `custom-${Date.now()}`, name: foodName, ingredients: [] },
-        )
-      : api.recognizeFoodFromImage(photoUri ?? '');
+      ? api.identifyMealFromText(foodName)
+      : api.identifyMealFromPhoto(photoUri ?? '');
 
-    load.then((item) => {
-      setFoodItem(item);
-      // Figma 예시처럼 마지막 재료 하나만 기본 해제된 상태로 시작한다 (재료가 있을 때만)
-      setSelectedIds(item.ingredients.slice(0, -1).map((ingredient) => ingredient.id));
-    });
+    load
+      .then((result) => {
+        setIdentify(result);
+        // 서버가 미리 선택해준 checked 를 그대로 초기 선택 상태로 쓴다
+        setSelectedIds(result.ingredients.filter((i) => i.checked).map((i) => String(i.id)));
+        setHasSoup(result.has_broth);
+      })
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[D2] 재료 식별 실패:', err);
+        setLoadError(true);
+      });
   }, [foodName, photoUri]);
 
   const toggleIngredient = (id: string) => {
@@ -70,7 +100,63 @@ export default function FoodResultScreen() {
     setAddingCustom(false);
   };
 
-  const allIngredients = foodItem ? [...foodItem.ingredients, ...customIngredients] : [];
+  const serverIngredientIds = new Set(identify?.ingredients.map((i) => String(i.id)) ?? []);
+  const allIngredients: Ingredient[] = identify
+    ? [...identify.ingredients.map((i) => ({ id: String(i.id), name: i.name })), ...customIngredients]
+    : [];
+
+  const handleConfirm = async () => {
+    if (!identify || !portion || !method || submitting) return;
+
+    setSubmitError(false);
+    setSubmitting(true);
+    try {
+      const eatenAt = new Date().toISOString();
+      const ingredientIds = selectedIds
+        .filter((id) => serverIngredientIds.has(id))
+        .map((id) => Number(id));
+      const customNames = selectedIds
+        .filter((id) => !serverIngredientIds.has(id))
+        .map((id) => customIngredients.find((c) => c.id === id)?.name)
+        .filter((name): name is string => Boolean(name));
+
+      const result = await api.createMeal({
+        food_id: identify.food_id,
+        food_name: identify.food_name,
+        eaten_at: eatenAt,
+        portion: PORTION_API_MAP[portion],
+        ate_broth: hasSoup ?? null,
+        method,
+        ingredient_ids: ingredientIds,
+        custom_ingredients: customNames,
+      });
+
+      const ingredientNames = selectedIds
+        .map((id) => allIngredients.find((ingredient) => ingredient.id === id)?.name)
+        .filter((name): name is string => Boolean(name))
+        .join(',');
+
+      const forwardParams = {
+        meal_id: String(result.meal_id),
+        food_name: identify.food_name,
+        eaten_at: eatenAt,
+        portion,
+        ingredients: ingredientNames,
+      };
+
+      if (result.has_insight) {
+        router.push({ pathname: '/food/ingredient', params: forwardParams });
+      } else {
+        router.push({ pathname: '/food/complete', params: forwardParams });
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[D2] POST /meals failed:', err);
+      setSubmitError(true);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <ThemedView type="onboardingBackground" style={styles.screen}>
@@ -99,10 +185,10 @@ export default function FoodResultScreen() {
           )}
         </ThemedView>
 
-        {foodItem ? (
+        {identify ? (
           <>
             <ThemedText type="h1" themeColor="textPrimary" style={styles.foodName}>
-              {foodItem.name}
+              {identify.food_name}
             </ThemedText>
             <ThemedText type="bodyS" themeColor="textSecondary" style={styles.sectionHint}>
               맞는 재료만 남겨주세요
@@ -185,18 +271,32 @@ export default function FoodResultScreen() {
               </View>
             </ThemedView>
           </>
+        ) : loadError ? (
+          <ThemedText type="bodyS" themeColor="textSecondary" style={styles.errorText}>
+            음식 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.
+          </ThemedText>
+        ) : null}
+
+        {submitError ? (
+          <ThemedText type="bodyS" themeColor="textSecondary" style={styles.errorText}>
+            전송에 실패했어요. 잠시 후 다시 시도해주세요.
+          </ThemedText>
         ) : null}
       </ScrollView>
 
       <BottomButton
         label="확인"
-        onPress={() => router.push('/food/ingredient')}
+        disabled={!identify || !portion || !method || submitting}
+        onPress={handleConfirm}
       />
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
+  errorText: {
+    marginTop: Spacing.three,
+  },
   screen: {
     flex: 1,
   },

@@ -1,6 +1,6 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/components/common/BackButton';
@@ -9,34 +9,56 @@ import { SearchIcon } from '@/components/common/icons';
 import { AlternativeCard } from '@/components/food/AlternativeCard';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useMoruData } from '@/hooks/useMoruData';
 import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
 import * as api from '@/services/api';
-import type { Alternative } from '@/types/food';
+import type { MealInsightResponse } from '@/types/food';
+
+type ForwardParams = {
+  meal_id?: string;
+  food_name?: string;
+  eaten_at?: string;
+  portion?: string;
+  ingredients?: string;
+};
 
 /**
  * D3 음식 확인 · 참고 정보와 대체안.
- * 최근 기록 기반 관찰(원인 단정 없음) + 지금 바로 시도해볼 수 있는 대안을 보여준다.
- * 하단 CTA는 D4(기록 완료) 화면으로 이어진다.
+ * GET /meals/{meal_id}/insight 응답만 사용한다(D2에서 전달받은 meal_id 기준).
+ * observation 이 null 이면 카드를 그리지 않고, caveat 는 안전장치이므로 항상 표시한다.
+ * suggestions 는 서버가 준 배열/rank 순서를 그대로 쓴다 — 프론트에서 순위를 다시 계산하지 않는다.
  */
 export default function FoodIngredientScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
-  const { analysis } = useMoruData();
+  const { meal_id, food_name, eaten_at, portion, ingredients } =
+    useLocalSearchParams<ForwardParams>();
 
-  const [alternatives, setAlternatives] = useState<Alternative[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const mealId = Number(meal_id);
+  const hasValidMealId = meal_id !== undefined && Number.isFinite(mealId);
+
+  const [insight, setInsight] = useState<MealInsightResponse | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [selectedRank, setSelectedRank] = useState<number | null>(null);
 
   useEffect(() => {
-    api.getAlternatives('food-kimchi-jjigae').then(setAlternatives);
-  }, []);
+    if (!hasValidMealId) return;
+    api
+      .getMealInsight(mealId)
+      .then(setInsight)
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[D3] GET /meals/{meal_id}/insight failed:', err);
+        setLoadError(true);
+      });
+  }, [hasValidMealId, mealId]);
 
-  const topPattern = analysis?.hasEnoughData ? analysis.ingredientPatterns[0] : undefined;
-  const sleepFactor = topPattern?.coOccurringFactors.find((f) => f.factor === 'poor-sleep');
-
-  const finish = () => router.push('/food/complete');
+  const finish = () =>
+    router.push({
+      pathname: '/food/complete',
+      params: { meal_id, food_name, eaten_at, portion, ingredients },
+    });
 
   return (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
@@ -46,51 +68,66 @@ export default function FoodIngredientScreen() {
         <View style={styles.headerRow}>
           <BackButton />
           <ThemedText type="label" themeColor="textPrimary">
-            김치찌개
+            {insight?.food_name ?? food_name ?? ''}
           </ThemedText>
         </View>
 
-        <ThemedView type="surfaceCard" style={styles.hintBar}>
-          <SearchIcon size={18} color={theme.textMuted} />
-          <ThemedText type="bodyS" themeColor="textSecondary" style={styles.hintText}>
-            국물에 양파즙이 들어있을 수 있어요
+        {!hasValidMealId ? (
+          <ThemedText type="bodyS" themeColor="textSecondary" style={styles.errorText}>
+            불러올 기록 정보가 없어요.
           </ThemedText>
-        </ThemedView>
+        ) : loadError ? (
+          <ThemedText type="bodyS" themeColor="textSecondary" style={styles.errorText}>
+            참고 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.
+          </ThemedText>
+        ) : insight ? (
+          <>
+            <ThemedView type="surfaceCard" style={styles.hintBar}>
+              <SearchIcon size={18} color={theme.textMuted} />
+              <ThemedText type="bodyS" themeColor="textSecondary" style={styles.hintText}>
+                {insight.note}
+              </ThemedText>
+            </ThemedView>
 
-        {topPattern ? (
-          <ThemedView type="surfaceCard" style={styles.patternCard}>
-            <ThemedText type="caption" themeColor="textMuted">
-              최근 기록을 보면
-            </ThemedText>
-            <ThemedText type="label" themeColor="textPrimary" style={styles.patternHeadline}>
-              {`${topPattern.ingredientName}가 들어간 식사 ${topPattern.discomfort.total}번 중 ${topPattern.discomfort.matched}번,\n몇 시간 뒤 불편함이 기록됐어요.`}
-            </ThemedText>
-
-            {sleepFactor ? (
-              <ThemedView type="onboardingBackground" style={styles.caveatBox}>
+            {insight.observation ? (
+              <ThemedView type="surfaceCard" style={styles.patternCard}>
                 <ThemedText type="caption" themeColor="textMuted">
-                  {`다만 그중 ${sleepFactor.occurrence.matched}번은 수면이 5시간 이하였어요.\n음식 때문이라고 단정하기는 일러요.`}
+                  {insight.observation.title}
                 </ThemedText>
+                <ThemedText type="label" themeColor="textPrimary" style={styles.patternHeadline}>
+                  {insight.observation.body}
+                </ThemedText>
+
+                <ThemedView type="onboardingBackground" style={styles.caveatBox}>
+                  <ThemedText type="caption" themeColor="textMuted">
+                    {insight.observation.caveat}
+                  </ThemedText>
+                </ThemedView>
               </ThemedView>
             ) : null}
-          </ThemedView>
+
+            <ThemedText type="label" themeColor="textPrimary" style={styles.sectionLabel}>
+              이렇게 하면 드실 수 있어요
+            </ThemedText>
+
+            <View style={styles.alternativeList}>
+              {insight.suggestions.map((suggestion) => (
+                <AlternativeCard
+                  key={suggestion.rank}
+                  alternative={{
+                    id: String(suggestion.rank),
+                    kind: 'method',
+                    title: suggestion.title,
+                    description: suggestion.detail,
+                  }}
+                  index={suggestion.rank}
+                  selected={selectedRank === suggestion.rank}
+                  onPress={() => setSelectedRank(suggestion.rank)}
+                />
+              ))}
+            </View>
+          </>
         ) : null}
-
-        <ThemedText type="label" themeColor="textPrimary" style={styles.sectionLabel}>
-          이렇게 하면 드실 수 있어요
-        </ThemedText>
-
-        <View style={styles.alternativeList}>
-          {alternatives.map((alternative, i) => (
-            <AlternativeCard
-              key={alternative.id}
-              alternative={alternative}
-              index={i + 1}
-              selected={selectedId === alternative.id}
-              onPress={() => setSelectedId(alternative.id)}
-            />
-          ))}
-        </View>
 
         <View style={styles.flex} />
 
@@ -123,6 +160,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
     marginTop: Spacing.two,
+  },
+  errorText: {
+    marginTop: Spacing.three,
   },
   hintBar: {
     flexDirection: 'row',

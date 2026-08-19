@@ -67,6 +67,66 @@ export type FoodRecord = {
 };
 
 /* ------------------------------------------------------------------ */
+/* D1~D4 실제 API 요청/응답                                              */
+/* POST /meals/identify(-photo) · POST /meals · GET /meals/{id}/insight  */
+/* ------------------------------------------------------------------ */
+
+export type MealIdentifyIngredient = {
+  id: number;
+  name: string;
+  /** 서버가 미리 선택해준 상태 — D2 초기 선택값으로 그대로 사용한다 */
+  checked: boolean;
+};
+
+export type MealIdentifyResponse = {
+  food_id: number;
+  food_name: string;
+  has_broth: boolean;
+  ingredients: MealIdentifyIngredient[];
+  confidence: string;
+};
+
+export type MealApiPortion = 'half' | 'one' | 'one_and_half_plus';
+export type MealApiMethod = 'photo' | 'text' | 'search';
+
+export type MealCreateRequest = {
+  food_id?: number | null;
+  food_name: string;
+  eaten_at: string;
+  portion: MealApiPortion;
+  ate_broth?: boolean | null;
+  method: MealApiMethod;
+  ingredient_ids?: number[];
+  custom_ingredients?: string[];
+};
+
+export type MealCreateResponse = {
+  meal_id: number;
+  has_insight: boolean;
+};
+
+export type MealObservation = {
+  title: string;
+  body: string;
+  /** 안전장치용 문구 — 절대 생략하지 않는다 */
+  caveat: string;
+};
+
+export type MealSuggestion = {
+  rank: number;
+  title: string;
+  detail: string;
+};
+
+export type MealInsightResponse = {
+  food_name: string;
+  note: string;
+  /** 근거가 얇으면 null — 그때는 카드를 그리지 않는다 */
+  observation: MealObservation | null;
+  suggestions: MealSuggestion[];
+};
+
+/* ------------------------------------------------------------------ */
 /* 대체 제안 (food/alternative)                                         */
 /* ------------------------------------------------------------------ */
 
@@ -118,6 +178,7 @@ export type MenuSuggestion = {
 
 export type ChatRole = 'user' | 'assistant';
 
+/** 화면에 그릴 말풍선 하나 — id/createdAt은 서버가 안 주므로 화면에서 로컬로 채운다 */
 export type ChatMessage = {
   id: string;
   role: ChatRole;
@@ -125,32 +186,68 @@ export type ChatMessage = {
   createdAt: string;
 };
 
-/**
- * 채팅 요청 시 함께 전달할 사용자 컨텍스트.
- * 지금은 사용하지 않고 향후 API 연결 시 채워 넣는다.
- */
-export type ChatContext = {
-  allergies: string[];
-  avoidedFoods: string[];
-  recentFoodRecordIds: string[];
-  recentSymptomRecordIds: string[];
+/* ------------------------------------------------------------------ */
+/* H1 AI 채팅 — POST /chat/messages 실제 API 요청/응답                    */
+/* GET으로 대화 이력을 불러오는 엔드포인트는 계약에 없다(화면 진입 시 항상 빈 대화로 시작) */
+/* ------------------------------------------------------------------ */
+
+export type ChatSendRequest = {
+  session_id?: number | null;
+  text: string;
+};
+
+export type ChatSendResponse = {
+  session_id: number;
+  reply: string;
+  blocked: boolean;
+  /**
+   * 항목 구조가 계약에 문서화되어 있지 않다(예시에도 항상 빈 배열).
+   * 내용을 해석·렌더링하지 않고 그대로 보존만 한다.
+   */
+  suggestions: unknown[];
 };
 
 /* ------------------------------------------------------------------ */
-/* 나의 식탁 ((tabs)/table)                                             */
+/* G 나의 식탁 — GET /mytable 실제 API 요청/응답                          */
 /* ------------------------------------------------------------------ */
 
-/** 점수가 아니라 상태와 관찰 횟수로만 표현한다. 'unconfirmed' = 아직 재도입을 시작하지 않은, 다시 먹어볼 음식 */
-export type MyTableStatus = 'safe' | 'candidate' | 'unconfirmed';
+/** 'to_try' = 아직 재도입을 시작하지 않은, 다시 먹어볼 음식 (서버 값 그대로) */
+export type MyTableSectionStatus = 'safe' | 'candidate' | 'to_try';
 
-export type MyTableFood = {
-  id: string;
-  name: string;
-  status: MyTableStatus;
-  /** 마지막으로 먹은 날 (ISO 8601) */
-  lastEatenAt?: string;
-  /** 불편함 없이 먹은 횟수 — 기술통계용 */
-  comfortableCount: number;
-  /** 전체 섭취 횟수 */
-  totalCount: number;
+export type MyTableItemAction = {
+  label: string;
+  screen: string;
+  ingredient_id: number;
+};
+
+export type MyTableItem = {
+  id: number;
+  label: string;
+  /** candidate/to_try 에서만 온다. 이미 서버가 "N번 중 M번 반응" 형태로 완성해서 준다 */
+  note?: string;
+  /** candidate 에서만 온다 */
+  hint?: string;
+  /** to_try 에서만 온다 — F1 진입 버튼 문구/대상 재료 */
+  action?: MyTableItemAction;
+};
+
+export type MyTableSection = {
+  status: MyTableSectionStatus;
+  title: string;
+  items: MyTableItem[];
+};
+
+export type SavedRecommendationKind = 'recipe' | 'substitution' | 'menu';
+
+export type SavedRecommendation = {
+  kind: SavedRecommendationKind;
+  ref_id: number;
+  title: string;
+};
+
+export type MyTableResponse = {
+  headline: string;
+  sub: string;
+  sections: MyTableSection[];
+  saved_recommendations: SavedRecommendation[];
 };

@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -8,16 +8,16 @@ import { BottomButton } from '@/components/common/BottomButton';
 import { Chip } from '@/components/common/Chip';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useMoruData } from '@/hooks/useMoruData';
 import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
-import { mockFoodItems } from '@/mock/foods';
+import * as api from '@/services/api';
+import type { EliminationDays, IngredientContains } from '@/types/reintroduction';
 
-const PREP_DAY_OPTIONS = [
+/** 서버가 허용하는 값은 3 또는 7 뿐이다 (ChallengeIn.elimination_days enum) */
+const PREP_DAY_OPTIONS: { days: EliminationDays; label: string }[] = [
   { days: 3, label: '가볍게' },
-  { days: 5, label: '권장' },
   { days: 7, label: '확실하게' },
-] as const;
+];
 
 function formatEndDate(days: number): string {
   const end = new Date();
@@ -25,22 +25,68 @@ function formatEndDate(days: number): string {
   return `${end.getMonth() + 1}월 ${end.getDate()}일에 끝나요`;
 }
 
-/** F2 도전 · 제한 설정. 재도입할 음식을 며칠간 빼둘지 준비 기간만 정한다 */
+/**
+ * F2 도전 · 제한 설정.
+ * 화면 진입 시 GET /ingredients/{id}/contains 로 관련 음식을 읽어온다(쓰기 없음).
+ * 확정 버튼을 눌렀을 때만 POST /challenges 를 호출한다 — 진입/토글로는 절대 호출하지 않는다.
+ */
 export default function ReintroductionSetupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
-  const { analysis } = useMoruData();
-  const [days, setDays] = useState<number>();
+  const { ingredient_id, ingredient_name } = useLocalSearchParams<{
+    ingredient_id?: string;
+    ingredient_name?: string;
+  }>();
+  const ingredientId = Number(ingredient_id);
 
-  const topPattern = analysis?.hasEnoughData ? analysis.ingredientPatterns[0] : undefined;
-  const ingredientName = topPattern?.ingredientName ?? '이 음식';
+  const [days, setDays] = useState<EliminationDays>();
+  const [contains, setContains] = useState<IngredientContains | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(false);
 
-  const relatedFoods = topPattern
-    ? mockFoodItems
-        .filter((item) => item.ingredients.some((ingredient) => ingredient.id === topPattern.ingredientId))
-        .map((item) => item.name)
-    : [];
+  useEffect(() => {
+    if (!ingredientId) return;
+    api
+      .getIngredientContains(ingredientId)
+      .then(setContains)
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[F2] GET /ingredients/{id}/contains failed:', err);
+        setLoadError(true);
+      });
+  }, [ingredientId]);
+
+  const ingredientName = contains?.ingredient_name ?? ingredient_name ?? '이 음식';
+  const relatedFoods = contains?.contains ?? [];
+
+  const handleConfirm = async () => {
+    if (!days || submitting || !ingredientId) return;
+
+    setSubmitError(false);
+    setSubmitting(true);
+    try {
+      const result = await api.createChallenge({
+        ingredient_id: ingredientId,
+        elimination_days: days,
+      });
+      router.push({
+        pathname: '/reintroduction/progress',
+        params: {
+          challenge_id: String(result.challenge_id),
+          status: result.status,
+          eliminate_until: result.eliminate_until,
+        },
+      });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[F2] POST /challenges failed:', err);
+      setSubmitError(true);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
@@ -126,12 +172,23 @@ export default function ReintroductionSetupScreen() {
               </View>
             </View>
           ) : null}
+
+          {loadError ? (
+            <ThemedText type="bodyS" themeColor="textSecondary" style={styles.errorText}>
+              음식 목록을 불러오지 못했어요. 잠시 후 다시 시도해주세요.
+            </ThemedText>
+          ) : null}
+          {submitError ? (
+            <ThemedText type="bodyS" themeColor="textSecondary" style={styles.errorText}>
+              전송에 실패했어요. 잠시 후 다시 시도해주세요.
+            </ThemedText>
+          ) : null}
         </View>
 
         <BottomButton
           label="이렇게 시작할게요"
-          disabled={!days}
-          onPress={() => router.push('/reintroduction/progress')}
+          disabled={!days || submitting}
+          onPress={handleConfirm}
         />
       </ThemedView>
     </ScrollView>
@@ -203,5 +260,8 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
+  },
+  errorText: {
+    marginTop: -Spacing.one,
   },
 });

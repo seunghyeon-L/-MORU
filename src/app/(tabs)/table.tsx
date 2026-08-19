@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -7,24 +8,112 @@ import { ExpansionCard } from '@/components/table/ExpansionCard';
 import { MoreVerticalIcon } from '@/components/common/icons';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useMoruData } from '@/hooks/useMoruData';
 import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
-import { mockOriginallyAvoidedCount } from '@/mock/foods';
+import * as api from '@/services/api';
+import type { MyTableResponse, MyTableSection } from '@/types/food';
+
+function TableSectionBlock({
+  section,
+  theme,
+  onCheck,
+}: {
+  section: MyTableSection;
+  theme: ReturnType<typeof useTheme>;
+  onCheck: () => void;
+}) {
+  if (section.items.length === 0) return null;
+
+  switch (section.status) {
+    case 'safe':
+      return (
+        <View style={styles.section}>
+          <ThemedText type="label" themeColor="textPrimary">
+            {section.title}
+          </ThemedText>
+          <View style={styles.tagWrap}>
+            {section.items.map((item) => (
+              <ThemedView key={item.id} type="brandSoft" style={styles.tag}>
+                <View style={[styles.tagDot, { backgroundColor: theme.brand }]} />
+                <ThemedText type="label" themeColor="brandText">
+                  {item.label}
+                </ThemedText>
+              </ThemedView>
+            ))}
+          </View>
+        </View>
+      );
+
+    case 'candidate':
+      return (
+        <View style={styles.section}>
+          <ThemedText type="label" themeColor="textPrimary">
+            {section.title}
+          </ThemedText>
+          {section.items.map((item) => (
+            <ThemedView
+              key={item.id}
+              type="surfaceCard"
+              style={[styles.candidateCard, { borderColor: theme.coral }]}>
+              <ThemedText type="label" themeColor="textPrimary">
+                {item.label}
+              </ThemedText>
+              {item.note || item.hint ? (
+                <ThemedText type="caption" themeColor="textMuted">
+                  {[item.note, item.hint].filter(Boolean).join(' · ')}
+                </ThemedText>
+              ) : null}
+            </ThemedView>
+          ))}
+        </View>
+      );
+
+    case 'to_try':
+      return (
+        <View style={styles.section}>
+          <ThemedText type="label" themeColor="textPrimary">
+            {section.title}
+          </ThemedText>
+          <View style={styles.candidateList}>
+            {section.items.map((item) => (
+              <CandidateFoodCard key={item.id} food={item} onCheck={onCheck} />
+            ))}
+          </View>
+        </View>
+      );
+
+    default:
+      return null;
+  }
+}
 
 /**
  * G 나의 식탁.
- * 점수 기반 UI는 사용하지 않고 상태와 관찰 횟수만 보여준다.
+ * GET /mytable 을 화면 진입마다 직접 불러온다 — useMoruData 의 1회성 캐시를 쓰지 않는다.
+ * F4 "나의 식탁에 저장하기"(POST /challenges/{id}/save) 이후 이 화면으로 돌아왔을 때
+ * 최신 상태가 반영되려면 재진입 시마다 새로 조회해야 하기 때문이다.
+ * 점수형 UI는 쓰지 않고, 서버가 준 headline/title/note/hint 문구를 그대로 표시한다.
  */
 export default function TableScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
-  const { myTableFoods } = useMoruData();
 
-  const safeFoods = myTableFoods.filter((food) => food.status === 'safe');
-  const candidateFoods = myTableFoods.filter((food) => food.status === 'candidate');
-  const unconfirmedFoods = myTableFoods.filter((food) => food.status === 'unconfirmed');
+  const [table, setTable] = useState<MyTableResponse | null>(null);
+  const [loadError, setLoadError] = useState(false);
+
+  useEffect(() => {
+    api
+      .getMyTable()
+      .then(setTable)
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[G] GET /mytable failed:', err);
+        setLoadError(true);
+      });
+  }, []);
+
+  const goToReintroduction = () => router.push('/reintroduction');
 
   return (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
@@ -41,75 +130,44 @@ export default function TableScreen() {
           <MoreVerticalIcon size={20} color={theme.textMuted} />
         </View>
 
-        <ExpansionCard reclaimedCount={safeFoods.length} avoidedCount={mockOriginallyAvoidedCount} />
+        {table ? (
+          <>
+            <ExpansionCard headline={table.headline} sub={table.sub} />
 
-        {safeFoods.length > 0 ? (
-          <View style={styles.section}>
-            <ThemedText type="label" themeColor="textPrimary">
-              안심하고 먹는 음식
-            </ThemedText>
-            <View style={styles.tagWrap}>
-              {safeFoods.map((food) => (
-                <ThemedView key={food.id} type="brandSoft" style={styles.tag}>
-                  <View style={[styles.tagDot, { backgroundColor: theme.brand }]} />
-                  <ThemedText type="label" themeColor="brandText">
-                    {food.name}
-                  </ThemedText>
-                </ThemedView>
-              ))}
-            </View>
-          </View>
-        ) : null}
+            {table.sections.map((section) => (
+              <TableSectionBlock
+                key={section.status}
+                section={section}
+                theme={theme}
+                onCheck={goToReintroduction}
+              />
+            ))}
 
-        {candidateFoods.length > 0 ? (
-          <View style={styles.section}>
-            <ThemedText type="label" themeColor="textPrimary">
-              확인된 후보
-            </ThemedText>
-            {candidateFoods.map((food) => {
-              const reaction = food.totalCount - food.comfortableCount;
-              return (
-                <ThemedView
-                  key={food.id}
-                  type="surfaceCard"
-                  style={[styles.candidateCard, { borderColor: theme.coral }]}>
-                  <ThemedText type="label" themeColor="textPrimary">
-                    {food.name}
-                  </ThemedText>
-                  <ThemedText type="caption" themeColor="textMuted">
-                    {`${food.totalCount}번 중 ${reaction}번 반응 · 양을 줄여보세요`}
-                  </ThemedText>
-                </ThemedView>
-              );
-            })}
-          </View>
-        ) : null}
-
-        {unconfirmedFoods.length > 0 ? (
-          <View style={styles.section}>
-            <ThemedText type="label" themeColor="textPrimary">
-              다시 먹어볼 음식
-            </ThemedText>
-            <View style={styles.candidateList}>
-              {unconfirmedFoods.map((food) => (
-                <CandidateFoodCard
-                  key={food.id}
-                  food={food}
-                  onCheck={() => router.push('/reintroduction')}
-                />
-              ))}
-            </View>
-          </View>
-        ) : null}
-
-        <View style={styles.section}>
-          <ThemedText type="label" themeColor="textPrimary">
-            대체 추천
+            {table.saved_recommendations.length > 0 ? (
+              <View style={styles.section}>
+                <ThemedText type="label" themeColor="textPrimary">
+                  저장한 추천
+                </ThemedText>
+                <View style={styles.savedList}>
+                  {table.saved_recommendations.map((rec) => (
+                    <ThemedView
+                      key={`${rec.kind}-${rec.ref_id}`}
+                      type="surfaceCard"
+                      style={styles.savedCard}>
+                      <ThemedText type="label" themeColor="textPrimary">
+                        {rec.title}
+                      </ThemedText>
+                    </ThemedView>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+          </>
+        ) : loadError ? (
+          <ThemedText type="bodyS" themeColor="textSecondary" style={styles.errorText}>
+            나의 식탁 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.
           </ThemedText>
-          <ThemedText type="caption" themeColor="textMuted">
-            내 기록을 바탕으로 더 편한 선택을 찾아드려요.
-          </ThemedText>
-        </View>
+        ) : null}
       </ThemedView>
     </ScrollView>
   );
@@ -161,5 +219,15 @@ const styles = StyleSheet.create({
   },
   candidateList: {
     gap: Spacing.two,
+  },
+  savedList: {
+    gap: Spacing.two,
+  },
+  savedCard: {
+    padding: Spacing.three,
+    borderRadius: Spacing.three,
+  },
+  errorText: {
+    marginTop: Spacing.three,
   },
 });

@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -49,7 +49,9 @@ const SUGGESTIONS: Suggestion[] = [
 /**
  * H1 AI와 대화하기.
  * AI는 결정을 대신하지 않고 참고할 만한 선택지를 제안하는 역할만 한다.
- * 지금은 services/api.ts 의 mock 응답만 사용한다.
+ * POST /chat/messages 를 전송 시점에만 호출한다 — 대화 이력을 불러오는 엔드포인트는
+ * 계약에 없어 화면은 항상 빈 대화로 시작한다. session_id 를 들고 있다가 다음 전송에
+ * 그대로 실어 보내면 서버가 같은 대화로 이어준다.
  */
 export default function FoodChatScreen() {
   const router = useRouter();
@@ -61,12 +63,9 @@ export default function FoodChatScreen() {
   const isFoodEntry = mode === 'search' || mode === 'manual';
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [sessionId, setSessionId] = useState<number>();
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-
-  useEffect(() => {
-    api.getChatHistory().then(setMessages);
-  }, []);
 
   const send = async (text: string) => {
     const trimmed = text.trim();
@@ -82,12 +81,27 @@ export default function FoodChatScreen() {
     setInput('');
     setSending(true);
 
-    const reply = await api.sendChatMessage(trimmed);
-    setMessages((prev) => [...prev, reply]);
-    setSending(false);
+    try {
+      const response = await api.sendChatMessage({ session_id: sessionId, text: trimmed });
+      setSessionId(response.session_id);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `assistant-${Date.now()}`,
+          role: 'assistant',
+          text: response.reply,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
 
-    if (isFoodEntry) {
-      router.push({ pathname: '/food/result', params: { foodName: trimmed } });
+      if (isFoodEntry) {
+        router.push({ pathname: '/food/result', params: { foodName: trimmed } });
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[H1] POST /chat/messages failed:', err);
+    } finally {
+      setSending(false);
     }
   };
 

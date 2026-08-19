@@ -130,3 +130,37 @@ export type SymptomDetail = {
   contextEtcText?: string;
   memo?: string;
 };
+
+/* ------------------------------------------------------------------ */
+/* POST /symptoms — 실제 API 요청/응답 (E0·E1·E2 를 한 번에 저장한다)       */
+/* ------------------------------------------------------------------ */
+
+export type SymptomApiOnset = 'just_now' | 'about_1h' | 'since_morning' | 'since_yesterday';
+export type SymptomApiLevel = 'none' | 'mild' | 'strong';
+
+export type SymptomLogDetail = {
+  kind: string;
+  level: SymptomApiLevel;
+};
+
+export type SymptomLogRequest = {
+  details: SymptomLogDetail[];
+  onset: SymptomApiOnset;
+  location?: DiscomfortLocation | null;
+  blood_in_stool?: boolean;
+  contexts?: string[];
+};
+
+/** red_flag 가 true 일 때만 채워진다 — symptom/medical.tsx 에 그대로 전달한다 */
+export type SymptomNotice = {
+  title: string;
+  body: string;
+  footer: string;
+};
+
+export type SymptomLogResponse = {
+  symptom_log_id: number;
+  red_flag: boolean;
+  followup_at: string;
+  notice: SymptomNotice | null;
+};

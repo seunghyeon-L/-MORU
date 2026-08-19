@@ -1,75 +1,108 @@
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/components/common/BackButton';
+import { Chip } from '@/components/common/Chip';
 import { MORUButton } from '@/components/common/MORUButton';
 import { SproutIcon } from '@/components/common/icons';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useMoruData } from '@/hooks/useMoruData';
 import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
+import * as api from '@/services/api';
+import type { ChallengeAttemptResult, ChallengeDetail } from '@/types/reintroduction';
 
-const DAY_OPTIONS = [
-  { id: 'mon', label: '월' },
-  { id: 'tue', label: '화' },
-  { id: 'wed', label: '수' },
-  { id: 'thu', label: '목' },
-  { id: 'fri', label: '금' },
-  { id: 'sat', label: '토' },
-  { id: 'sun', label: '일' },
-] as const;
+const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 
-type DayId = (typeof DAY_OPTIONS)[number]['id'];
-
-/** 일정이 있어 자동으로 제외되는 날. 연동된 일정 데이터가 없는 기본 상태에서는 모든 요일을 선택할 수 있다 */
-const BUSY_DAY_IDS: readonly DayId[] = [];
-
-type AttemptResult = 'uncomfortable' | 'okay' | null;
-
-/** 첫 방문 시 화면 기준 — 1번째 시도는 이미 진행된 상태로 보여준다 */
-const INITIAL_ATTEMPTS: AttemptResult[] = ['uncomfortable', null, null];
-
-function attemptStatusLabel(result: AttemptResult, isCurrent: boolean): string {
-  if (result === 'uncomfortable') return '불편함이 있었어요';
-  if (result === 'okay') return '괜찮았어요';
-  return isCurrent ? '이번 주' : '다음 주';
+function weekdayLabel(dateStr: string): string {
+  return WEEKDAY_LABELS[new Date(dateStr).getDay()];
 }
 
-/** F3 표적 도전 · 진행. 이번 주 편한 날 하루를 골라 소량으로 시도해본다 */
+/**
+ * F3 표적 도전 · 진행.
+ * F2에서 생성된 challenge_id 로 GET /challenges/{id} 를 불러와 그대로 표시한다.
+ * 시도 결과를 확정할 때만 POST /challenges/{id}/attempts/{seq} 를 호출한다.
+ */
 export default function ReintroductionProgressScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
-  const { analysis } = useMoruData();
+  const { challenge_id } = useLocalSearchParams<{ challenge_id?: string }>();
+  const challengeId = Number(challenge_id);
 
-  const [attempts, setAttempts] = useState<AttemptResult[]>(INITIAL_ATTEMPTS);
-  const [selectedDays, setSelectedDays] = useState<DayId[]>(['sun']);
+  const [challenge, setChallenge] = useState<ChallengeDetail | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(false);
 
-  const toggleDay = (id: DayId) => {
-    setSelectedDays((prev) => (prev.includes(id) ? prev.filter((day) => day !== id) : [...prev, id]));
-  };
+  useEffect(() => {
+    if (!challengeId) return;
+    api
+      .getChallengeDetail(challengeId)
+      .then(setChallenge)
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[F3] GET /challenges/{id} failed:', err);
+        setLoadError(true);
+      });
+  }, [challengeId]);
 
-  const topPattern = analysis?.hasEnoughData ? analysis.ingredientPatterns[0] : undefined;
-  const ingredientName = topPattern?.ingredientName ?? '이 음식';
+  const handleAttempt = async (result: ChallengeAttemptResult) => {
+    if (!challenge || submitting) return;
 
-  const currentIndex = attempts.findIndex((result) => result === null);
-  const completedCount = attempts.filter((result) => result !== null).length;
+    setSubmitError(false);
+    setSubmitting(true);
+    try {
+      const response = await api.recordChallengeAttempt(challenge.challenge_id, challenge.current_seq, {
+        result,
+        tested_at: new Date().toISOString(),
+      });
 
-  const handleTryToday = () => {
-    if (currentIndex === -1) return;
+      if (response.finished) {
+        router.push({
+          pathname: '/reintroduction/result',
+          params: { challenge_id: String(challenge.challenge_id) },
+        });
+        return;
+      }
 
-    if (currentIndex === attempts.length - 1) {
-      router.push('/reintroduction/result');
-      return;
+      const refreshed = await api.getChallengeDetail(challenge.challenge_id);
+      setChallenge(refreshed);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[F3] POST attempt failed:', err);
+      setSubmitError(true);
+    } finally {
+      setSubmitting(false);
     }
-
-    setAttempts((prev) =>
-      prev.map((result, index) => (index === currentIndex ? 'okay' : result)),
-    );
   };
+
+  if (!challenge) {
+    return (
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <ThemedView
+          type="onboardingBackground"
+          style={[
+            styles.container,
+            { paddingTop: insets.top, paddingBottom: insets.bottom + Spacing.three },
+          ]}>
+          <View style={styles.content}>
+            <View style={styles.headerRow}>
+              <BackButton />
+              <ThemedText type="smallBold">확인하기</ThemedText>
+            </View>
+            {loadError ? (
+              <ThemedText type="bodyS" themeColor="textSecondary" style={styles.errorText}>
+                진행 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.
+              </ThemedText>
+            ) : null}
+          </View>
+        </ThemedView>
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
@@ -82,77 +115,53 @@ export default function ReintroductionProgressScreen() {
         <View style={styles.content}>
           <View style={styles.headerRow}>
             <BackButton />
-            <ThemedText type="smallBold">{`${ingredientName} 확인하기`}</ThemedText>
-          </View>
-
-          <View style={styles.progressTrack}>
-            {attempts.map((_, index) => (
-              <ThemedView
-                key={index}
-                type={index < completedCount ? 'brand' : 'backgroundElement'}
-                style={styles.progressSegment}
-              />
-            ))}
+            <ThemedText type="smallBold">{`${challenge.ingredient_name} 확인하기`}</ThemedText>
           </View>
 
           <ThemedText type="caption" themeColor="textMuted">
-            {`${(currentIndex === -1 ? attempts.length : currentIndex + 1)}번째 시도`}
+            {`${challenge.current_seq}번째 시도`}
           </ThemedText>
 
           <ThemedText type="h1" themeColor="textPrimary" style={styles.title}>
-            {`이번 주 아무 날 하루,\n${ingredientName}를 평소만큼 드셔보세요`}
+            {challenge.instruction}
           </ThemedText>
-          <ThemedText type="bodyS" themeColor="textSecondary">
-            연속으로 하지 않아도 돼요. 편한 날 하루면 됩니다.
-          </ThemedText>
+          {challenge.note ? (
+            <ThemedText type="bodyS" themeColor="textSecondary">
+              {challenge.note}
+            </ThemedText>
+          ) : null}
+
+          {challenge.available_days.length > 0 ? (
+            <ThemedView type="surfaceCard" style={[styles.card, { borderColor: theme.borderSubtle }]}>
+              <ThemedText type="label" themeColor="textPrimary">
+                이번 주 가능한 날
+              </ThemedText>
+              <View style={styles.dayRow}>
+                {challenge.available_days.map((date) => (
+                  <Chip key={date} label={weekdayLabel(date)} />
+                ))}
+              </View>
+              {challenge.excluded_note ? (
+                <ThemedText type="caption" themeColor="textMuted">
+                  {challenge.excluded_note}
+                </ThemedText>
+              ) : null}
+            </ThemedView>
+          ) : null}
 
           <ThemedView type="surfaceCard" style={[styles.card, { borderColor: theme.borderSubtle }]}>
-            <ThemedText type="label" themeColor="textPrimary">
-              이번 주 가능한 날
-            </ThemedText>
-            <View style={styles.dayRow}>
-              {DAY_OPTIONS.map((option) => {
-                const busy = BUSY_DAY_IDS.includes(option.id);
-                const selected = selectedDays.includes(option.id);
-                return (
-                  <Pressable
-                    key={option.id}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected, disabled: busy }}
-                    disabled={busy}
-                    onPress={() => toggleDay(option.id)}
-                    style={({ pressed }) => [styles.dayPress, (pressed || busy) && styles.dimmed]}>
-                    <ThemedView
-                      type={selected ? 'brand' : busy ? 'backgroundElement' : 'brandSoft'}
-                      style={styles.dayCircle}>
-                      <ThemedText
-                        type="label"
-                        themeColor={selected ? 'textOnBrand' : busy ? 'textMuted' : 'brandText'}>
-                        {option.label}
-                      </ThemedText>
-                    </ThemedView>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <ThemedText type="caption" themeColor="textMuted">
-              일정이 있는 날은 뺐어요.
-            </ThemedText>
-          </ThemedView>
-
-          <ThemedView type="surfaceCard" style={[styles.card, { borderColor: theme.borderSubtle }]}>
-            {attempts.map((result, index) => (
-              <View key={index} style={styles.historyRow}>
+            {challenge.attempts.map((attempt) => (
+              <View key={attempt.seq} style={styles.historyRow}>
                 <ThemedView
-                  type={result !== null ? 'brand' : 'backgroundElement'}
+                  type={attempt.status === 'done' ? 'brand' : 'backgroundElement'}
                   style={styles.historyDot}
                 />
                 <View style={styles.historyTexts}>
                   <ThemedText type="caption" themeColor="textMuted">
-                    {`${index + 1}번째`}
+                    {`${attempt.seq}번째`}
                   </ThemedText>
                   <ThemedText type="label" themeColor="textPrimary">
-                    {attemptStatusLabel(result, index === currentIndex)}
+                    {attempt.label}
                   </ThemedText>
                 </View>
               </View>
@@ -162,11 +171,38 @@ export default function ReintroductionProgressScreen() {
           <ThemedView type="brandSoft" style={styles.noticeCard}>
             <SproutIcon size={20} color={theme.brandText} />
             <ThemedText type="caption" themeColor="textPrimary" style={styles.noticeText}>
-              {'증상이 나더라도 장에 손상이 가지는 않아요.\n편하게 시도해보세요.'}
+              {challenge.reassurance}
             </ThemedText>
           </ThemedView>
+
+          {submitError ? (
+            <ThemedText type="bodyS" themeColor="textSecondary" style={styles.errorText}>
+              전송에 실패했어요. 잠시 후 다시 시도해주세요.
+            </ThemedText>
+          ) : null}
         </View>
 
+        <View
+          style={[
+            styles.footerRow,
+            { paddingHorizontal: Spacing.four },
+          ]}>
+          <View style={styles.footerButton}>
+            <MORUButton
+              label="괜찮았어요"
+              variant="secondary"
+              disabled={submitting}
+              onPress={() => handleAttempt('no_reaction')}
+            />
+          </View>
+          <View style={styles.footerButton}>
+            <MORUButton
+              label="불편함이 있었어요"
+              disabled={submitting}
+              onPress={() => handleAttempt('reaction')}
+            />
+          </View>
+        </View>
         <View
           style={[
             styles.footerRow,
@@ -176,11 +212,9 @@ export default function ReintroductionProgressScreen() {
             <MORUButton
               label="다음에 할게요"
               variant="secondary"
+              disabled={submitting}
               onPress={() => router.push('/reintroduction')}
             />
-          </View>
-          <View style={styles.footerButton}>
-            <MORUButton label="오늘 했어요" onPress={handleTryToday} />
           </View>
         </View>
       </ThemedView>
@@ -208,16 +242,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.one,
   },
-  progressTrack: {
-    flexDirection: 'row',
-    gap: 4,
-    marginTop: Spacing.one,
-  },
-  progressSegment: {
-    flex: 1,
-    height: 5,
-    borderRadius: 2.5,
-  },
   title: {
     fontSize: 22,
     lineHeight: 30,
@@ -232,17 +256,8 @@ const styles = StyleSheet.create({
   },
   dayRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  dayPress: {
-    borderRadius: 18,
-  },
-  dayCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
   },
   historyRow: {
     flexDirection: 'row',
@@ -269,15 +284,15 @@ const styles = StyleSheet.create({
   noticeText: {
     flex: 1,
   },
+  errorText: {
+    marginTop: Spacing.one,
+  },
   footerRow: {
     flexDirection: 'row',
     gap: Spacing.two,
-    paddingTop: Spacing.three,
+    paddingTop: Spacing.two,
   },
   footerButton: {
     flex: 1,
-  },
-  dimmed: {
-    opacity: 0.5,
   },
 });

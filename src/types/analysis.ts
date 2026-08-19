@@ -58,3 +58,41 @@ export type AnalysisResult = {
   ingredientPatterns: IngredientPattern[];
   symptomFoodWindows: SymptomFoodWindow[];
 };
+
+/* ------------------------------------------------------------------ */
+/* E3 실제 패턴 분석 — GET /patterns                                    */
+/* 근거가 얇으면 summary 가 null 로 온다 — 그 자체가 정상 상태다.           */
+/* ------------------------------------------------------------------ */
+
+export type PatternsTimelineEntry = {
+  time: string;
+  meal: string;
+  food: string;
+  ago: string;
+  phase: string;
+};
+
+export type PatternsCofactor = {
+  label: string;
+  count: number;
+};
+
+export type PatternsVerdictAction = {
+  label: string;
+  screen: string;
+  ingredient_id: number;
+};
+
+export type PatternsVerdict = {
+  title: string;
+  body: string;
+  action?: PatternsVerdictAction;
+};
+
+export type PatternsResponse = {
+  headline: string;
+  summary: string | null;
+  timeline: PatternsTimelineEntry[];
+  cofactors: PatternsCofactor[];
+  verdict: PatternsVerdict | null;
+};

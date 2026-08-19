@@ -6,31 +6,130 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FoodInputSheet } from '@/components/food/FoodInputSheet';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useMoruData } from '@/hooks/useMoruData';
-import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
 import * as api from '@/services/api';
+import type { HomeCard, HomeResponse } from '@/types/home';
 
 /**
  * C 홈 (기본 화면).
- * 오늘의 상태 요약, 재도입 제안, 최근 인사이트를 한눈에 보여준다.
+ * GET /home 의 cards 배열을 type 별로 그대로 렌더링한다. cards: [] 는 신규 사용자의 정상 상태다.
  */
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const theme = useTheme();
-  const { reintroductionCandidates, analysis } = useMoruData();
 
-  const [nickname, setNickname] = useState<string | undefined>();
-  const [suggestionDismissed, setSuggestionDismissed] = useState(false);
+  const [home, setHome] = useState<HomeResponse | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [snoozingId, setSnoozingId] = useState<number | null>(null);
   const [foodSheetVisible, setFoodSheetVisible] = useState(false);
 
   useEffect(() => {
-    api.getUserProfile().then((profile) => setNickname(profile.nickname));
+    api
+      .getHomeCards()
+      .then(setHome)
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[Home] GET /home failed:', err);
+        setLoadError(true);
+      });
   }, []);
 
-  const candidate = reintroductionCandidates[0];
-  const topPattern = analysis?.hasEnoughData ? analysis.ingredientPatterns[0] : undefined;
+  /** "나중에" — 서버에 snooze 를 저장하고 홈을 다시 불러온다. 프론트에서 카드만 숨기지 않는다 */
+  const handleSnooze = async (ingredientId: number) => {
+    setSnoozingId(ingredientId);
+    try {
+      await api.snoozeSuggestion(ingredientId);
+      const refreshed = await api.getHomeCards();
+      setHome(refreshed);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[Home] snooze failed:', err);
+    } finally {
+      setSnoozingId(null);
+    }
+  };
+
+  const renderCard = (card: HomeCard, index: number) => {
+    switch (card.type) {
+      case 'challenge_progress':
+        return (
+          <ThemedView key={index} type="surfaceCard" style={styles.card}>
+            <ThemedText type="h1" themeColor="textPrimary" style={styles.cardHeadline}>
+              {card.title}
+            </ThemedText>
+            <ThemedText type="bodyS" themeColor="textSecondary" style={styles.cardBody}>
+              {card.body}
+            </ThemedText>
+            <Pressable
+              style={styles.ctaPressable}
+              onPress={() =>
+                router.push({
+                  pathname: '/reintroduction/progress',
+                  params: { challenge_id: String(card.action.challenge_id) },
+                })
+              }>
+              <ThemedView type="brand" style={styles.ctaPrimary}>
+                <ThemedText type="label" themeColor="textOnBrand">
+                  {card.action.label}
+                </ThemedText>
+              </ThemedView>
+            </Pressable>
+          </ThemedView>
+        );
+
+      case 'challenge_suggestion':
+        return (
+          <ThemedView key={index} type="surfaceCard" style={styles.card}>
+            <ThemedView type="brandLight" style={styles.badge}>
+              <ThemedText type="caption" themeColor="brandText">
+                다시 먹어볼 음식
+              </ThemedText>
+            </ThemedView>
+            <ThemedText type="h1" themeColor="textPrimary" style={styles.cardHeadline}>
+              {card.title}
+            </ThemedText>
+            <ThemedText type="bodyS" themeColor="textSecondary" style={styles.cardBody}>
+              {card.body}
+            </ThemedText>
+            <View style={styles.ctaRow}>
+              <Pressable style={styles.ctaPressable} onPress={() => router.push('/reintroduction')}>
+                <ThemedView type="brand" style={styles.ctaPrimary}>
+                  <ThemedText type="label" themeColor="textOnBrand">
+                    {card.action.label}
+                  </ThemedText>
+                </ThemedView>
+              </Pressable>
+              <Pressable
+                style={styles.ctaPressable}
+                disabled={snoozingId === card.action.ingredient_id}
+                onPress={() => handleSnooze(card.action.ingredient_id)}>
+                <ThemedView type="onboardingBackground" style={styles.ctaSecondary}>
+                  <ThemedText type="label" themeColor="textMuted">
+                    {card.dismiss.label}
+                  </ThemedText>
+                </ThemedView>
+              </Pressable>
+            </View>
+          </ThemedView>
+        );
+
+      case 'schedule_note':
+      case 'weekly_recap':
+        return (
+          <ThemedView key={index} type="surfaceCard" style={styles.card}>
+            <ThemedText type="label" themeColor="textPrimary">
+              {card.title}
+            </ThemedText>
+            <ThemedText type="bodyS" themeColor="textSecondary" style={styles.cardBody}>
+              {card.body}
+            </ThemedText>
+          </ThemedView>
+        );
+
+      default:
+        return null;
+    }
+  };
 
   return (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
@@ -45,68 +144,26 @@ export default function HomeScreen() {
             MORU
           </ThemedText>
           <ThemedText type="h1" themeColor="textPrimary" style={styles.greeting}>
-            {`안녕하세요, ${nickname ?? '회원'}님`}
+            {home?.greeting ?? ''}
           </ThemedText>
         </View>
 
-        {candidate && !suggestionDismissed ? (
+        {home && home.cards.length > 0 ? (
+          home.cards.map(renderCard)
+        ) : home && home.cards.length === 0 ? (
           <ThemedView type="surfaceCard" style={styles.card}>
-            <ThemedView type="brandLight" style={styles.badge}>
-              <ThemedText type="caption" themeColor="brandText">
-                다시 먹어볼 음식
-              </ThemedText>
-            </ThemedView>
-            <ThemedText type="h1" themeColor="textPrimary" style={styles.cardHeadline}>
-              {`${candidate.foodName}, 다시 시도해볼 만해요`}
+            <ThemedText type="label" themeColor="textPrimary">
+              아직 보여드릴 카드가 없어요
             </ThemedText>
             <ThemedText type="bodyS" themeColor="textSecondary" style={styles.cardBody}>
-              실제로 시도한 사람의 71%가 그 음식을 되찾았어요.
+              기록이 쌓이면 여기에 보여드릴게요.
             </ThemedText>
-            <View style={styles.ctaRow}>
-              <Pressable
-                style={styles.ctaPressable}
-                onPress={() => router.push('/reintroduction')}>
-                <ThemedView type="brand" style={styles.ctaPrimary}>
-                  <ThemedText type="label" themeColor="textOnBrand">
-                    해볼래요
-                  </ThemedText>
-                </ThemedView>
-              </Pressable>
-              <Pressable style={styles.ctaPressable} onPress={() => setSuggestionDismissed(true)}>
-                <ThemedView type="onboardingBackground" style={styles.ctaSecondary}>
-                  <ThemedText type="label" themeColor="textMuted">
-                    나중에
-                  </ThemedText>
-                </ThemedView>
-              </Pressable>
-            </View>
           </ThemedView>
-        ) : null}
-
-        {topPattern ? (
-          <Pressable onPress={() => router.push('/analysis')}>
-            <ThemedView type="surfaceCard" style={styles.card}>
-              <View style={styles.insightTitleRow}>
-                <View style={[styles.dot, { backgroundColor: theme.brand }]} />
-                <ThemedText type="label" themeColor="textPrimary">
-                  이번 주 정리해봤어요
-                </ThemedText>
-              </View>
-              <ThemedText type="bodyS" themeColor="textSecondary" style={styles.cardBody}>
-                {`${topPattern.ingredientName}가 들어간 식사 ${topPattern.discomfort.total}번 중 ${topPattern.discomfort.matched}번, 불편함이 기록됐어요.`}
-              </ThemedText>
-            </ThemedView>
-          </Pressable>
-        ) : null}
-
-        <ThemedView type="surfaceCard" style={styles.card}>
-          <ThemedText type="label" themeColor="textPrimary">
-            이번 주는 일정이 여유롭네요
+        ) : loadError ? (
+          <ThemedText type="bodyS" themeColor="textSecondary" style={styles.errorText}>
+            홈 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.
           </ThemedText>
-          <ThemedText type="bodyS" themeColor="textSecondary" style={styles.cardBody}>
-            무언가 새로 시도해보기 좋은 때예요.
-          </ThemedText>
-        </ThemedView>
+        ) : null}
 
         <View style={styles.flex} />
 
@@ -171,10 +228,10 @@ const styles = StyleSheet.create({
   ctaRow: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 16,
   },
   ctaPressable: {
     flex: 1,
+    marginTop: 16,
   },
   ctaPrimary: {
     alignItems: 'center',
@@ -188,15 +245,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 11,
   },
-  insightTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  errorText: {
+    marginBottom: 12,
   },
   flex: {
     flex: 1,

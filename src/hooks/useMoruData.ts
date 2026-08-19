@@ -13,9 +13,8 @@ import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
 import * as api from '@/services/api';
 import type { AnalysisResult } from '@/types/analysis';
-import type { FoodRecord, MyTableFood } from '@/types/food';
+import type { FoodRecord } from '@/types/food';
 import { EMPTY_ONBOARDING_DATA, type OnboardingData } from '@/types/onboarding';
-import type { ReintroductionCandidate } from '@/types/reintroduction';
 import type { SymptomRecord } from '@/types/symptom';
 
 export type MoruState = {
@@ -23,9 +22,7 @@ export type MoruState = {
   onboarding: OnboardingData;
   foodRecords: FoodRecord[];
   symptomRecords: SymptomRecord[];
-  myTableFoods: MyTableFood[];
   analysis: AnalysisResult | null;
-  reintroductionCandidates: ReintroductionCandidate[];
   /** api 로부터 최초 데이터를 받아왔는지 */
   loaded: boolean;
 };
@@ -34,9 +31,7 @@ const initialState: MoruState = {
   onboarding: EMPTY_ONBOARDING_DATA,
   foodRecords: [],
   symptomRecords: [],
-  myTableFoods: [],
   analysis: null,
-  reintroductionCandidates: [],
   loaded: false,
 };
 
@@ -72,16 +67,12 @@ function loadOnce(): Promise<void> {
   loadPromise = Promise.all([
     api.getFoodRecords(),
     api.getSymptomRecords(),
-    api.getMyTableFoods(),
     api.getAnalysis(),
-    api.getReintroductionCandidates(),
-  ]).then(([foodRecords, symptomRecords, myTableFoods, analysis, reintroductionCandidates]) => {
+  ]).then(([foodRecords, symptomRecords, analysis]) => {
     setState({
       foodRecords,
       symptomRecords,
-      myTableFoods,
       analysis,
-      reintroductionCandidates,
       loaded: true,
     });
   });

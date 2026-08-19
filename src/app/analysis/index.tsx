@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -7,73 +8,33 @@ import { BottomButton } from '@/components/common/BottomButton';
 import { Chip } from '@/components/common/Chip';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useMoruData } from '@/hooks/useMoruData';
 import { Spacing } from '@/constants/theme';
-import type { IngredientPattern, SymptomFoodWindow } from '@/types/analysis';
-import type { FoodRecord } from '@/types/food';
-
-function pad(n: number): string {
-  return String(n).padStart(2, '0');
-}
-
-function formatClock(iso: string): string {
-  const date = new Date(iso);
-  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function mealLabel(iso: string): string {
-  const hour = new Date(iso).getHours();
-  if (hour < 10) return '아침';
-  if (hour < 16) return '점심';
-  return '저녁';
-}
-
-function hoursAgo(fromIso: string, toIso: string): number {
-  return Math.max(1, Math.round((new Date(toIso).getTime() - new Date(fromIso).getTime()) / 3600000));
-}
-
-type TimelineEntry = {
-  window: SymptomFoodWindow;
-  foodRecord: FoodRecord;
-};
-
-/** 상위 패턴 재료가 포함된 식사 → 이후 증상 발생까지의 타임라인 (최대 2개) */
-function buildTimeline(
-  windows: SymptomFoodWindow[],
-  foodRecords: FoodRecord[],
-  ingredientId: string,
-): TimelineEntry[] {
-  const entries: TimelineEntry[] = [];
-  for (const window of windows) {
-    const foodRecord = foodRecords.find(
-      (record) =>
-        window.foodRecordIds.includes(record.id) &&
-        record.food.ingredients.some((ingredient) => ingredient.id === ingredientId),
-    );
-    if (foodRecord) entries.push({ window, foodRecord });
-    if (entries.length === 2) break;
-  }
-  return entries;
-}
+import * as api from '@/services/api';
+import type { PatternsResponse } from '@/types/analysis';
 
 /**
  * E3 개인화 패턴 분석.
- *
- * 특정 음식을 원인으로 단정하지 않고, "N번 중 M번" 형태의 관찰 결과와
- * 함께 기록된 상황(수면 부족 등 교란 변수)을 나란히 보여준다.
+ * GET /patterns 를 그대로 표시한다. summary 가 null 이면 아직 근거가 부족하다는 뜻이며 정상 상태다.
  */
 export default function AnalysisScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { analysis, foodRecords } = useMoruData();
 
-  const topPattern: IngredientPattern | undefined = analysis?.hasEnoughData
-    ? analysis.ingredientPatterns[0]
-    : undefined;
+  const [patterns, setPatterns] = useState<PatternsResponse | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
-  const timeline = topPattern
-    ? buildTimeline(analysis?.symptomFoodWindows ?? [], foodRecords, topPattern.ingredientId)
-    : [];
+  useEffect(() => {
+    api
+      .getPatterns()
+      .then(setPatterns)
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[E3] GET /patterns failed:', err);
+        setLoadError(true);
+      });
+  }, []);
+
+  const verdict = patterns?.verdict;
 
   return (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
@@ -89,74 +50,81 @@ export default function AnalysisScreen() {
             <ThemedText type="smallBold">오늘의 기록</ThemedText>
           </View>
 
-          <ThemedText type="h1" themeColor="textPrimary" style={styles.title}>
-            {'지금까지 기록을\n모아봤어요'}
-          </ThemedText>
+          {patterns ? (
+            <ThemedText type="h1" themeColor="textPrimary" style={styles.title}>
+              {patterns.headline}
+            </ThemedText>
+          ) : null}
 
-          {topPattern ? (
+          {patterns?.summary ? (
             <>
               <ThemedView type="surfaceCard" style={styles.card}>
                 <ThemedText type="bodyM" themeColor="textPrimary">
-                  {`${topPattern.ingredientName}가 들어간 식사 ${topPattern.discomfort.total}번 중 ${topPattern.discomfort.matched}번,\n몇 시간 뒤 불편함이 있었어요.`}
+                  {patterns.summary}
                 </ThemedText>
 
-                <View style={styles.timeline}>
-                  {timeline.map(({ window, foodRecord }) => (
-                    <View key={window.symptomRecordId} style={styles.timelineRow}>
-                      <ThemedView type="brand" style={styles.timelineDot} />
-                      <View style={styles.timelineTexts}>
-                        <ThemedText type="label" themeColor="textPrimary">
-                          {`${formatClock(foodRecord.eatenAt)} ${mealLabel(foodRecord.eatenAt)} · ${foodRecord.food.name}`}
-                        </ThemedText>
-                        <ThemedText type="caption" themeColor="textMuted">
-                          {`${hoursAgo(foodRecord.eatenAt, window.symptomOccurredAt)}시간 전`}
-                        </ThemedText>
+                {patterns.timeline.length > 0 ? (
+                  <View style={styles.timeline}>
+                    {patterns.timeline.map((entry, index) => (
+                      <View key={index} style={styles.timelineRow}>
+                        <ThemedView type="brand" style={styles.timelineDot} />
+                        <View style={styles.timelineTexts}>
+                          <ThemedText type="label" themeColor="textPrimary">
+                            {`${entry.time} ${entry.meal} · ${entry.food}`}
+                          </ThemedText>
+                          <ThemedText type="caption" themeColor="textMuted">
+                            {`${entry.ago} · ${entry.phase}`}
+                          </ThemedText>
+                        </View>
                       </View>
-                    </View>
-                  ))}
-                </View>
+                    ))}
+                  </View>
+                ) : null}
 
-                {topPattern.coOccurringFactors.length > 0 ? (
+                {patterns.cofactors.length > 0 ? (
                   <View style={styles.factorSection}>
                     <ThemedText type="caption" themeColor="textMuted">
                       그날 함께 있었던 것
                     </ThemedText>
                     <View style={styles.factorRow}>
-                      {topPattern.coOccurringFactors.map((factor) => (
-                        <Chip
-                          key={factor.factor}
-                          label={`${factor.label} · ${factor.occurrence.matched}번`}
-                        />
+                      {patterns.cofactors.map((factor) => (
+                        <Chip key={factor.label} label={`${factor.label} · ${factor.count}번`} />
                       ))}
                     </View>
                   </View>
                 ) : null}
               </ThemedView>
 
-              <ThemedView type="backgroundElement" style={styles.conclusionCard}>
-                <ThemedText type="label" themeColor="textPrimary">
-                  음식 때문인지는 아직 알 수 없어요
-                </ThemedText>
-                <ThemedText type="caption" themeColor="textMuted">
-                  {'수면이 겹친 날이 많아서, 지금 단정하기는 일러요.\n정확히 알아보고 싶으시면 도와드릴게요.'}
-                </ThemedText>
-              </ThemedView>
+              {verdict ? (
+                <ThemedView type="backgroundElement" style={styles.conclusionCard}>
+                  <ThemedText type="label" themeColor="textPrimary">
+                    {verdict.title}
+                  </ThemedText>
+                  <ThemedText type="caption" themeColor="textMuted">
+                    {verdict.body}
+                  </ThemedText>
+                </ThemedView>
+              ) : null}
             </>
-          ) : (
+          ) : loadError ? (
+            <ThemedText type="bodyS" themeColor="textSecondary" style={styles.errorText}>
+              패턴 정보를 불러오지 못했어요. 잠시 후 다시 시도해주세요.
+            </ThemedText>
+          ) : patterns ? (
             <ThemedView type="surfaceCard" style={styles.card}>
               <ThemedText type="bodyM" themeColor="textSecondary">
                 아직 패턴을 보여드릴 만큼 기록이 쌓이지 않았어요. 기록이 조금 더 모이면 함께
                 살펴볼게요.
               </ThemedText>
             </ThemedView>
-          )}
+          ) : null}
         </View>
 
         <BottomButton
-          label={topPattern ? `${topPattern.ingredientName}, 확인해볼래요` : '홈으로'}
-          onPress={() => (topPattern ? router.push('/reintroduction') : router.replace('/(tabs)'))}
+          label={verdict?.action ? verdict.action.label : '홈으로'}
+          onPress={() => (verdict?.action ? router.push('/reintroduction') : router.replace('/(tabs)'))}
           secondary={
-            topPattern
+            verdict?.action
               ? { label: '홈으로', variant: 'ghost', onPress: () => router.replace('/(tabs)') }
               : undefined
           }
@@ -234,5 +202,8 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     borderRadius: Spacing.three,
     gap: Spacing.one,
+  },
+  errorText: {
+    marginTop: Spacing.one,
   },
 });

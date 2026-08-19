@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -9,21 +9,51 @@ import { ThemedView } from '@/components/themed-view';
 import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
 
+type ForwardParams = {
+  food_name?: string;
+  eaten_at?: string;
+  portion?: string;
+  ingredients?: string;
+};
+
+/** D2 와 동일한 로컬 라벨 매핑 — 화면마다 로컬로 둔다(공용 PORTION_OPTIONS 라벨과 다른 Figma 문구) */
+const PORTION_LABELS: Record<string, string> = {
+  small: '반',
+  normal: '한 그릇',
+  large: '한 그릇 반 이상',
+};
+
+function pad(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+function formatEatenAt(iso?: string): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  return `${date.getMonth() + 1}월 ${date.getDate()}일 / ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 /**
  * D4 기록 완료.
- * D2/D3 에는 아직 화면 간 데이터 공유 구조가 없어(모두 로컬 state), Figma 예시와 동일한
- * 요약값을 mock 으로 보여준다. 실제 저장/API 연동은 하지 않는다.
+ * POST /meals 확정(D2) 이후 D2/D3 에서 전달받은 route params 로 요약을 그린다.
+ * 서버가 주지 않은 문구를 새로 만들지 않는다 — 안내 문구(불편함이 생기면...)는
+ * API 응답 필드가 아니라 이 화면 고정 카피다.
  */
 export default function FoodCompleteScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
+  const { food_name, eaten_at, portion, ingredients } = useLocalSearchParams<ForwardParams>();
 
-  const summary = {
-    food: '김치찌개 · 한 그릇',
-    time: '8월 16일 / 12:30',
-    ingredients: '김치 · 돼지고기 · 두부\n양파 · 마늘',
-  };
+  const portionLabel = portion ? PORTION_LABELS[portion] : undefined;
+  const foodSummary = [food_name, portionLabel].filter(Boolean).join(' · ');
+  const timeSummary = formatEatenAt(eaten_at);
+  const ingredientsSummary = ingredients
+    ? ingredients
+        .split(',')
+        .filter(Boolean)
+        .join(' · ')
+    : '';
 
   return (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
@@ -50,30 +80,36 @@ export default function FoodCompleteScreen() {
         </ThemedText>
 
         <ThemedView type="surfaceCard" style={styles.summaryCard}>
-          <View style={styles.summaryRow}>
-            <ThemedText type="caption" themeColor="textMuted">
-              음식
-            </ThemedText>
-            <ThemedText type="label" themeColor="textPrimary">
-              {summary.food}
-            </ThemedText>
-          </View>
-          <View style={styles.summaryRow}>
-            <ThemedText type="caption" themeColor="textMuted">
-              시간
-            </ThemedText>
-            <ThemedText type="label" themeColor="textPrimary">
-              {summary.time}
-            </ThemedText>
-          </View>
-          <View style={styles.summaryRow}>
-            <ThemedText type="caption" themeColor="textMuted">
-              확인한 재료
-            </ThemedText>
-            <ThemedText type="label" themeColor="textPrimary" style={styles.summaryIngredients}>
-              {summary.ingredients}
-            </ThemedText>
-          </View>
+          {foodSummary ? (
+            <View style={styles.summaryRow}>
+              <ThemedText type="caption" themeColor="textMuted">
+                음식
+              </ThemedText>
+              <ThemedText type="label" themeColor="textPrimary">
+                {foodSummary}
+              </ThemedText>
+            </View>
+          ) : null}
+          {timeSummary ? (
+            <View style={styles.summaryRow}>
+              <ThemedText type="caption" themeColor="textMuted">
+                시간
+              </ThemedText>
+              <ThemedText type="label" themeColor="textPrimary">
+                {timeSummary}
+              </ThemedText>
+            </View>
+          ) : null}
+          {ingredientsSummary ? (
+            <View style={styles.summaryRow}>
+              <ThemedText type="caption" themeColor="textMuted">
+                확인한 재료
+              </ThemedText>
+              <ThemedText type="label" themeColor="textPrimary" style={styles.summaryIngredients}>
+                {ingredientsSummary}
+              </ThemedText>
+            </View>
+          ) : null}
         </ThemedView>
 
         <ThemedView type="brandSoft" style={styles.adviceCard}>

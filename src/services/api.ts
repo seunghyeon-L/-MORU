@@ -1,45 +1,60 @@
 /**
  * MORU 데이터 접근 계층.
  *
- * 현재는 백엔드가 없어 src/mock 의 임시 데이터를 반환한다.
+ * 백엔드 API 계약이 확정된 함수는 apiRequest() 로 실제 네트워크를 호출하고,
+ * 아직 계약이 없는 화면은 src/mock 의 임시 데이터를 그대로 반환한다.
  * 화면 코드는 mock 을 직접 import 하지 않고 항상 이 모듈만 사용한다.
- * 나중에 실제 API가 준비되면 각 함수 내부의 구현만 fetch 로 교체하면 된다.
+ * 계약이 새로 확정되면 각 함수 내부의 구현만 apiRequest 호출로 교체하면 된다.
  *
- * 모든 함수는 실제 네트워크 호출과 동일하게 Promise 를 반환한다.
+ * 모든 함수는 Promise 를 반환한다.
  */
 
 import { mockAnalysisResult } from '@/mock/analysis';
 import {
-  mockAlternatives,
-  mockChatMessages,
   mockFoodItems,
   mockFoodRecords,
   mockMenuSuggestions,
   mockMoreMenuSuggestions,
-  mockMyTableFoods,
   mockRecipe,
   mockSubstitutions,
 } from '@/mock/foods';
-import { mockReintroductionCandidates, mockReintroductionPlan } from '@/mock/reintroduction';
+import { mockReintroductionPlan } from '@/mock/reintroduction';
 import { mockSymptomRecords } from '@/mock/symptoms';
-import { mockOnboardingData, mockUserProfile } from '@/mock/user';
-import type { AnalysisResult } from '@/types/analysis';
+import { mockOnboardingData } from '@/mock/user';
+import type { AnalysisResult, PatternsResponse } from '@/types/analysis';
 import type {
-  Alternative,
-  ChatContext,
-  ChatMessage,
+  ChatSendRequest,
+  ChatSendResponse,
   FoodItem,
   FoodRecord,
   Ingredient,
   IngredientSubstitution,
+  MealCreateRequest,
+  MealCreateResponse,
+  MealIdentifyResponse,
+  MealInsightResponse,
   MenuSuggestion,
-  MyTableFood,
+  MyTableResponse,
   Recipe,
 } from '@/types/food';
+import type { HomeResponse, SnoozeResponse } from '@/types/home';
 import type { OnboardingData } from '@/types/onboarding';
-import type { ReintroductionCandidate, ReintroductionPlan } from '@/types/reintroduction';
-import type { SymptomRecord } from '@/types/symptom';
-import type { UserProfile } from '@/types/user';
+import type {
+  ChallengeAttemptRequest,
+  ChallengeAttemptResponse,
+  ChallengeCreateRequest,
+  ChallengeCreateResponse,
+  ChallengeDetail,
+  ChallengeResult,
+  ChallengeSaveResponse,
+  ChallengeSuggestion,
+  IngredientContains,
+  ReintroductionPlan,
+} from '@/types/reintroduction';
+import type { SymptomLogRequest, SymptomLogResponse, SymptomRecord } from '@/types/symptom';
+import type { MeResponse } from '@/types/user';
+
+import { apiRequest } from './apiClient';
 
 /** 공통 API client(apiClient.ts)의 base URL을 그대로 노출한다 — 중복 정의하지 않는다 */
 export { API_BASE_URL } from './apiClient';
@@ -53,17 +68,19 @@ function ok<T>(value: T): Promise<T> {
 /* 사용자 / 온보딩                                                      */
 /* ------------------------------------------------------------------ */
 
-export function getUserProfile(): Promise<UserProfile> {
-  return ok(mockUserProfile);
-}
-
 export function getOnboardingData(): Promise<OnboardingData> {
   return ok(mockOnboardingData);
 }
 
 export function saveOnboardingData(data: OnboardingData): Promise<OnboardingData> {
-  // TODO: POST /onboarding
+  // TODO: POST /onboarding/profile — nickname 입력 UI, frequency 6단계 매핑, allergies/avoided_foods/
+  // baseline_symptoms 서버 vocabulary가 확정되기 전까지는 실제 호출로 바꾸지 않는다 (BLOCKED)
   return ok(data);
+}
+
+/** 앱 부팅 시 최초 1회 호출. onboarded/blocked 상태를 확인한다 */
+export function getMe(): Promise<MeResponse> {
+  return apiRequest<MeResponse>('/me');
 }
 
 /* ------------------------------------------------------------------ */
@@ -79,28 +96,36 @@ export function createFoodRecord(record: FoodRecord): Promise<FoodRecord> {
   return ok(record);
 }
 
-/** food/search — 메뉴 검색 */
-export function searchFoodItems(keyword: string): Promise<FoodItem[]> {
-  const trimmed = keyword.trim();
-  if (!trimmed) return ok(mockFoodItems);
-  return ok(mockFoodItems.filter((item) => item.name.includes(trimmed)));
+/** D1 텍스트 입력(메뉴 검색/직접 입력) → 재료 식별 */
+export function identifyMealFromText(text: string): Promise<MealIdentifyResponse> {
+  return apiRequest<MealIdentifyResponse>('/meals/identify', { method: 'POST', body: { text } });
 }
 
-/** food/camera → food/result — 사진에서 음식·재료 추정 */
-export function recognizeFoodFromImage(_imageUri: string): Promise<FoodItem> {
-  // TODO: POST /food-recognition (multipart)
-  return ok(mockFoodItems[0]);
+/** D1 사진 촬영 → 재료 식별 (multipart) */
+export function identifyMealFromPhoto(photoUri: string): Promise<MealIdentifyResponse> {
+  const form = new FormData();
+  form.append('photo', {
+    uri: photoUri,
+    name: 'photo.jpg',
+    type: 'image/jpeg',
+  } as unknown as Blob);
+  return apiRequest<MealIdentifyResponse>('/meals/identify-photo', { method: 'POST', body: form });
 }
 
-/** food/ingredient — 특정 음식의 재료 목록 */
+/** D2 확인 버튼을 눌렀을 때만 호출한다. 응답의 has_insight 로 D3 표시 여부를 결정한다 */
+export function createMeal(payload: MealCreateRequest): Promise<MealCreateResponse> {
+  return apiRequest<MealCreateResponse>('/meals', { method: 'POST', body: payload });
+}
+
+/** D3 참고 정보와 대체안. observation 이 null 이면 카드를 그리지 않는다 */
+export function getMealInsight(mealId: number): Promise<MealInsightResponse> {
+  return apiRequest<MealInsightResponse>(`/meals/${mealId}/insight`);
+}
+
+/** food/ingredient — 특정 음식의 재료 목록 (H4 대체안 화면에서 사용) */
 export function getIngredients(foodItemId: string): Promise<Ingredient[]> {
   const item = mockFoodItems.find((food) => food.id === foodItemId);
   return ok(item?.ingredients ?? []);
-}
-
-/** food/alternative — 대체 메뉴 / 대체 재료 / 조리법 변경 제안 */
-export function getAlternatives(_foodItemId: string): Promise<Alternative[]> {
-  return ok(mockAlternatives);
 }
 
 /** food/alternative (H4) — id로 특정 음식 항목 조회 */
@@ -129,25 +154,13 @@ export function getMoreMenuSuggestions(_foodItemId: string): Promise<MenuSuggest
 }
 
 /* ------------------------------------------------------------------ */
-/* AI 채팅 (food/chat)                                                  */
+/* H1 AI 채팅 (food/chat)                                               */
+/* 대화 이력을 불러오는 엔드포인트는 계약에 없다 — 화면은 항상 빈 대화로 시작한다 */
 /* ------------------------------------------------------------------ */
 
-export function getChatHistory(): Promise<ChatMessage[]> {
-  return ok(mockChatMessages);
-}
-
-/**
- * 지금은 고정된 mock 응답을 돌려준다.
- * context 는 온보딩 정보와 최근 기록을 담아 전달할 자리이며 아직 사용하지 않는다.
- */
-export function sendChatMessage(text: string, _context?: ChatContext): Promise<ChatMessage> {
-  // TODO: POST /chat
-  return ok({
-    id: `chat-mock-${text.length}`,
-    role: 'assistant',
-    text: '아직 준비 중인 기능이에요. 곧 기록을 함께 살펴보고 답변해드릴게요.',
-    createdAt: '2026-08-18T10:00:00.000Z',
-  });
+/** 사용자가 전송을 누를 때만 호출한다. session_id 를 실어 보내면 같은 대화로 이어진다 */
+export function sendChatMessage(payload: ChatSendRequest): Promise<ChatSendResponse> {
+  return apiRequest<ChatSendResponse>('/chat/messages', { method: 'POST', body: payload });
 }
 
 /* ------------------------------------------------------------------ */
@@ -159,8 +172,13 @@ export function getSymptomRecords(): Promise<SymptomRecord[]> {
 }
 
 export function createSymptomRecord(record: SymptomRecord): Promise<SymptomRecord> {
-  // TODO: POST /symptom-records
+  // TODO: POST /symptom-records (로컬 "최근 기록" 표시용 — 실제 저장은 logSymptom 이 한다)
   return ok(record);
+}
+
+/** E0·E1·E2 를 한 번에 저장한다. red_flag 가 true 면 notice 를 symptom/medical.tsx 로 전달한다 */
+export function logSymptom(payload: SymptomLogRequest): Promise<SymptomLogResponse> {
+  return apiRequest<SymptomLogResponse>('/symptoms', { method: 'POST', body: payload });
 }
 
 /* ------------------------------------------------------------------ */
@@ -171,20 +189,72 @@ export function getAnalysis(): Promise<AnalysisResult> {
   return ok(mockAnalysisResult);
 }
 
-/* ------------------------------------------------------------------ */
-/* 나의 식탁                                                            */
-/* ------------------------------------------------------------------ */
-
-export function getMyTableFoods(): Promise<MyTableFood[]> {
-  return ok(mockMyTableFoods);
+/** E3 개인화 패턴 분석. summary 가 null 이면 아직 근거가 부족하다는 뜻이며 정상 상태다 */
+export function getPatterns(): Promise<PatternsResponse> {
+  return apiRequest<PatternsResponse>('/patterns');
 }
 
 /* ------------------------------------------------------------------ */
-/* 재도입                                                               */
+/* 홈                                                                   */
 /* ------------------------------------------------------------------ */
 
-export function getReintroductionCandidates(): Promise<ReintroductionCandidate[]> {
-  return ok(mockReintroductionCandidates);
+/** C 홈 — cards: [] 도 정상 상태(신규 사용자)다 */
+export function getHomeCards(): Promise<HomeResponse> {
+  return apiRequest<HomeResponse>('/home');
+}
+
+/** challenge_suggestion 카드의 "나중에" — 호출 후 반드시 getHomeCards() 를 다시 불러야 한다 */
+export function snoozeSuggestion(ingredientId: number): Promise<SnoozeResponse> {
+  return apiRequest<SnoozeResponse>('/home/cards/suggestion/snooze', {
+    method: 'POST',
+    body: { ingredient_id: ingredientId },
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* 재도입 (도전)                                                        */
+/* ------------------------------------------------------------------ */
+
+/** F1 도전 제안 — 제안할 게 없으면 204(undefined) */
+export function getChallengeSuggestion(): Promise<ChallengeSuggestion | undefined> {
+  return apiRequest<ChallengeSuggestion | undefined>('/challenges/suggestion');
+}
+
+/** F2 화면 진입 시 읽기 전용으로 호출한다. 도전을 만들지 않는다 */
+export function getIngredientContains(ingredientId: number): Promise<IngredientContains> {
+  return apiRequest<IngredientContains>(`/ingredients/${ingredientId}/contains`);
+}
+
+/** F2 확정 버튼을 눌렀을 때만 호출한다 */
+export function createChallenge(payload: ChallengeCreateRequest): Promise<ChallengeCreateResponse> {
+  return apiRequest<ChallengeCreateResponse>('/challenges', { method: 'POST', body: payload });
+}
+
+/** F3 진행 상태. available_days 는 busy_days 를 이미 뺀 결과다 */
+export function getChallengeDetail(challengeId: number): Promise<ChallengeDetail> {
+  return apiRequest<ChallengeDetail>(`/challenges/${challengeId}`);
+}
+
+/** F3 — 시도 결과를 확정할 때만 호출한다. seq 는 서버가 알려준 current_seq 를 그대로 쓴다 */
+export function recordChallengeAttempt(
+  challengeId: number,
+  seq: number,
+  payload: ChallengeAttemptRequest,
+): Promise<ChallengeAttemptResponse> {
+  return apiRequest<ChallengeAttemptResponse>(`/challenges/${challengeId}/attempts/${seq}`, {
+    method: 'POST',
+    body: payload,
+  });
+}
+
+/** F4 — 2-of-3 판정. 숫자 점수가 아니라 grade 문자열로 온다 */
+export function getChallengeResult(challengeId: number): Promise<ChallengeResult> {
+  return apiRequest<ChallengeResult>(`/challenges/${challengeId}/result`);
+}
+
+/** F4 "나의 식탁에 저장하기" 버튼에서만 호출한다 */
+export function saveChallenge(challengeId: number): Promise<ChallengeSaveResponse> {
+  return apiRequest<ChallengeSaveResponse>(`/challenges/${challengeId}/save`, { method: 'POST' });
 }
 
 export function getReintroductionPlan(): Promise<ReintroductionPlan | null> {
@@ -196,7 +266,11 @@ export function saveReintroductionPlan(plan: ReintroductionPlan): Promise<Reintr
   return ok(plan);
 }
 
-/** 제안을 거절해도 어떤 불이익도 남기지 않는다 */
-export function declineReintroductionCandidate(_candidateId: string): Promise<void> {
-  return ok(undefined);
+/* ------------------------------------------------------------------ */
+/* G 나의 식탁                                                          */
+/* ------------------------------------------------------------------ */
+
+/** F4 저장(POST /challenges/{id}/save) 직후를 포함해 화면 진입 때마다 새로 불러야 한다 — 캐시하지 않는다 */
+export function getMyTable(): Promise<MyTableResponse> {
+  return apiRequest<MyTableResponse>('/mytable');
 }
