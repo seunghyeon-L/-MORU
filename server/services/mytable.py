@@ -9,6 +9,7 @@
 
 from datetime import datetime, timezone
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from models import Ingredient, MyTableItem, UserAllergy
@@ -47,8 +48,13 @@ def seed_from_onboarding(db: Session, user_id: int, avoided: list[str],
         if exists:
             continue
         # 마스터에 있으면 연결한다. 없으면 이름만 담는다 ('매운 음식' 같은 것).
+        #
+        # B3 칩은 "우유·유제품" 처럼 묶음 이름이라 재료 이름과 다르다.
+        # 그건 aliases 에 들어 있으므로 별칭으로도 찾는다 (마이그레이션 004).
         ing = (db.query(Ingredient)
-               .filter(Ingredient.name == label).one_or_none())
+               .filter(or_(Ingredient.name == label,
+                           Ingredient.aliases.any(label)))
+               .first())
         db.add(MyTableItem(
             user_id=user_id, ingredient_id=ing.id if ing else None,
             label=label, status="to_try",
