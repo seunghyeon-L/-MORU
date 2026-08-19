@@ -11,7 +11,10 @@ import type {
   FoodItem,
   FoodRecord,
   Ingredient,
+  IngredientSubstitution,
+  MenuSuggestion,
   MyTableFood,
+  Recipe,
 } from '@/types/food';
 
 /* ------------------------------------------------------------------ */
@@ -31,6 +34,9 @@ export const mockIngredients = {
   kimchi: { id: 'kimchi', name: '김치' },
   tofu: { id: 'tofu', name: '두부' },
   scallion: { id: 'scallion', name: '대파' },
+  gochujang: { id: 'gochujang', name: '고추장' },
+  sugar: { id: 'sugar', name: '설탕' },
+  sesameOil: { id: 'sesame-oil', name: '참기름' },
 } satisfies Record<string, Ingredient>;
 
 /* ------------------------------------------------------------------ */
@@ -79,6 +85,19 @@ export const mockFoodItems: FoodItem[] = [
     name: '녹차라떼',
     ingredients: [mockIngredients.greenTea, mockIngredients.milk],
     confirmedByUser: false,
+  },
+  {
+    id: 'food-jeyuk-bokkeum',
+    name: '제육볶음',
+    ingredients: [
+      mockIngredients.pork,
+      mockIngredients.onion,
+      mockIngredients.garlic,
+      mockIngredients.gochujang,
+      mockIngredients.sugar,
+      mockIngredients.sesameOil,
+    ],
+    confirmedByUser: true,
   },
 ];
 
@@ -150,6 +169,52 @@ export const mockAlternatives: Alternative[] = [
     title: '다른 메뉴 골라보기',
     description: '맑은 국 · 된장찌개',
   },
+];
+
+/* ------------------------------------------------------------------ */
+/* 대체 레시피 (food/alternative/recipe — H2)                           */
+/* ------------------------------------------------------------------ */
+
+export const mockRecipe: Recipe = {
+  id: 'recipe-green-tea-latte',
+  title: '속 편한 녹차라떼 레시피',
+  ingredients: [
+    { name: '우유 (또는 락토프리 우유)', amount: '150ml' },
+    { name: '녹차가루', amount: '1/2 tsp' },
+    { name: '알룰로스', amount: '1 tsp (선택)' },
+    { name: '바닐라 익스트랙', amount: '2~3방울 (선택)' },
+  ],
+  tip: '우유 대신 오트우유를 사용하면 더 편안할 수 있어요.',
+};
+
+/* ------------------------------------------------------------------ */
+/* 성분 대체 방법 (food/alternative/substitute — H3)                     */
+/* ------------------------------------------------------------------ */
+
+export const mockSubstitutions: IngredientSubstitution[] = [
+  { id: 'sub-milk', original: '우유', substitute: '락토프리 우유', note: '또는 오트우유, 아몬드우유' },
+  { id: 'sub-sugar', original: '설탕', substitute: '알룰로스, 스테비아', note: '또는 꿀 소량' },
+  { id: 'sub-syrup', original: '시럽/소스', substitute: '바닐라 익스트랙', note: '또는 시나몬 파우더' },
+];
+
+export const mockSubstitutionTips = [
+  { title: '양을 줄여서 시작하기', description: '소량으로 먼저 시도해보세요.' },
+  { title: '공복은 피하기', description: '식사 후 또는 간식과 함께 드세요.' },
+];
+
+/* ------------------------------------------------------------------ */
+/* 대체 메뉴 제안 (food/alternative/menu — H5)                          */
+/* ------------------------------------------------------------------ */
+
+export const mockMenuSuggestions: MenuSuggestion[] = [
+  { id: 'menu-1', name: '간장 돼지고기 덮밥', description: '양념 자극이 적어요.' },
+  { id: 'menu-2', name: '두부 간장 덮밥', description: '식물성 단백질로 편안하게.' },
+  { id: 'menu-3', name: '오징어 숙주볶음', description: '매운 양념 없이 깔끔해요.' },
+];
+
+export const mockMoreMenuSuggestions: MenuSuggestion[] = [
+  { id: 'menu-4', name: '순두부 덮밥', description: '부드럽고 자극이 적어요.' },
+  { id: 'menu-5', name: '가자미 조림', description: '담백한 흰살 생선 메뉴예요.' },
 ];
 
 /* ------------------------------------------------------------------ */

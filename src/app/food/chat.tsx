@@ -1,3 +1,4 @@
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -51,9 +52,13 @@ const SUGGESTIONS: Suggestion[] = [
  * 지금은 services/api.ts 의 mock 응답만 사용한다.
  */
 export default function FoodChatScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const scrollRef = useRef<ScrollView>(null);
+  // D1 "메뉴 검색"/"직접 입력"에서 들어온 경우에만 첫 입력을 D2로 전달한다
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const isFoodEntry = mode === 'search' || mode === 'manual';
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -80,6 +85,10 @@ export default function FoodChatScreen() {
     const reply = await api.sendChatMessage(trimmed);
     setMessages((prev) => [...prev, reply]);
     setSending(false);
+
+    if (isFoodEntry) {
+      router.push({ pathname: '/food/result', params: { foodName: trimmed } });
+    }
   };
 
   return (
@@ -133,7 +142,7 @@ export default function FoodChatScreen() {
               value={input}
               onChangeText={setInput}
               onSubmitEditing={() => send(input)}
-              placeholder="궁금한 걸 물어보세요"
+              placeholder={isFoodEntry ? '음식 이름을 입력해주세요 (예: 김치찌개)' : '궁금한 걸 물어보세요'}
               placeholderTextColor={theme.textMuted}
               style={[styles.input, { color: theme.textPrimary }]}
               returnKeyType="send"

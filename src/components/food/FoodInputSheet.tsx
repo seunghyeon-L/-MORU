@@ -32,11 +32,29 @@ export function FoodInputSheet({ visible, onClose }: FoodInputSheetProps) {
 
   const options: InputOption[] = [
     { id: 'photo', title: '사진 찍기', description: '가장 빠른 방법이에요', Icon: CameraIcon, href: '/food/camera' },
-    { id: 'search', title: '메뉴 검색', description: '사진이 없어도 괜찮아요', Icon: SearchIcon, href: '/food/search' },
-    // 검색 화면 자체에 "직접 입력" 항목이 포함돼 있어 기존 route 를 그대로 재사용한다.
-    { id: 'manual', title: '직접 입력', description: '검색에 없는 음식이라면', Icon: PencilIcon, href: '/food/search' },
-    // 원재료표 촬영 전용 화면은 아직 없어 카메라 촬영 흐름을 재사용한다.
-    { id: 'label', title: '원재료표 촬영', description: '가공식품 뒷면을 찍어주세요', Icon: DocumentIcon, href: '/food/camera' },
+    // 메뉴 검색 / 직접 입력은 H1 AI 대화창을 그대로 재사용하고 mode 로만 구분한다.
+    {
+      id: 'search',
+      title: '메뉴 검색',
+      description: '사진이 없어도 괜찮아요',
+      Icon: SearchIcon,
+      href: { pathname: '/food/chat', params: { mode: 'search' } },
+    },
+    {
+      id: 'manual',
+      title: '직접 입력',
+      description: '검색에 없는 음식이라면',
+      Icon: PencilIcon,
+      href: { pathname: '/food/chat', params: { mode: 'manual' } },
+    },
+    // 원재료표 촬영은 음식 사진 카메라 화면을 mode 로만 구분해 재사용한다.
+    {
+      id: 'label',
+      title: '원재료표 촬영',
+      description: '가공식품 뒷면을 찍어주세요',
+      Icon: DocumentIcon,
+      href: { pathname: '/food/camera', params: { mode: 'label' } },
+    },
   ];
 
   const select = (href: Href) => {

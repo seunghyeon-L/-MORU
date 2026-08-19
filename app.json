@@ -32,6 +32,12 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "음식/원재료표 사진을 촬영하려면 카메라 접근 권한이 필요해요."
+        }
       ]
     ],
     "experiments": {

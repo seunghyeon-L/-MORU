@@ -14,7 +14,11 @@ import {
   mockChatMessages,
   mockFoodItems,
   mockFoodRecords,
+  mockMenuSuggestions,
+  mockMoreMenuSuggestions,
   mockMyTableFoods,
+  mockRecipe,
+  mockSubstitutions,
 } from '@/mock/foods';
 import { mockReintroductionCandidates, mockReintroductionPlan } from '@/mock/reintroduction';
 import { mockSymptomRecords } from '@/mock/symptoms';
@@ -27,7 +31,10 @@ import type {
   FoodItem,
   FoodRecord,
   Ingredient,
+  IngredientSubstitution,
+  MenuSuggestion,
   MyTableFood,
+  Recipe,
 } from '@/types/food';
 import type { OnboardingData } from '@/types/onboarding';
 import type { ReintroductionCandidate, ReintroductionPlan } from '@/types/reintroduction';
@@ -94,6 +101,31 @@ export function getIngredients(foodItemId: string): Promise<Ingredient[]> {
 /** food/alternative — 대체 메뉴 / 대체 재료 / 조리법 변경 제안 */
 export function getAlternatives(_foodItemId: string): Promise<Alternative[]> {
   return ok(mockAlternatives);
+}
+
+/** food/alternative (H4) — id로 특정 음식 항목 조회 */
+export function getFoodItem(foodItemId: string): Promise<FoodItem | undefined> {
+  return ok(mockFoodItems.find((item) => item.id === foodItemId));
+}
+
+/** food/alternative/recipe (H2) */
+export function getRecipe(_recipeId: string): Promise<Recipe> {
+  return ok(mockRecipe);
+}
+
+/** food/alternative/substitute (H3) */
+export function getIngredientSubstitutions(_foodItemId: string): Promise<IngredientSubstitution[]> {
+  return ok(mockSubstitutions);
+}
+
+/** food/alternative/menu (H5) */
+export function getMenuSuggestions(_foodItemId: string): Promise<MenuSuggestion[]> {
+  return ok(mockMenuSuggestions);
+}
+
+/** "더 많은 메뉴 보기" — 지금은 고정된 mock 목록을 추가로 보여준다 */
+export function getMoreMenuSuggestions(_foodItemId: string): Promise<MenuSuggestion[]> {
+  return ok(mockMoreMenuSuggestions);
 }
 
 /* ------------------------------------------------------------------ */

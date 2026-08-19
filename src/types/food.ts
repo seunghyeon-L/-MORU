@@ -81,6 +81,38 @@ export type Alternative = {
 };
 
 /* ------------------------------------------------------------------ */
+/* 대체 레시피 (food/alternative/recipe — H2)                           */
+/* ------------------------------------------------------------------ */
+
+export type Recipe = {
+  id: string;
+  title: string;
+  ingredients: { name: string; amount: string }[];
+  tip?: string;
+};
+
+/* ------------------------------------------------------------------ */
+/* 성분 대체 방법 (food/alternative/substitute — H3)                     */
+/* ------------------------------------------------------------------ */
+
+export type IngredientSubstitution = {
+  id: string;
+  original: string;
+  substitute: string;
+  note?: string;
+};
+
+/* ------------------------------------------------------------------ */
+/* 대체 메뉴 제안 (food/alternative/menu — H5)                          */
+/* ------------------------------------------------------------------ */
+
+export type MenuSuggestion = {
+  id: string;
+  name: string;
+  description: string;
+};
+
+/* ------------------------------------------------------------------ */
 /* AI 채팅 (food/chat)                                                  */
 /* ------------------------------------------------------------------ */
 

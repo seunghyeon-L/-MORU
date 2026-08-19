@@ -1,4 +1,5 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,6 +31,8 @@ export default function FoodResultScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
+  // photoUri: 카메라(D1)에서 촬영한 사진, foodName: H1(메뉴 검색/직접 입력)에서 입력한 음식명
+  const { photoUri, foodName } = useLocalSearchParams<{ photoUri?: string; foodName?: string }>();
 
   const [foodItem, setFoodItem] = useState<FoodItem | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -40,12 +43,18 @@ export default function FoodResultScreen() {
   const [hasSoup, setHasSoup] = useState<boolean | undefined>();
 
   useEffect(() => {
-    api.recognizeFoodFromImage('').then((item) => {
+    const load = foodName
+      ? api.searchFoodItems(foodName).then(
+          (matches) => matches[0] ?? { id: `custom-${Date.now()}`, name: foodName, ingredients: [] },
+        )
+      : api.recognizeFoodFromImage(photoUri ?? '');
+
+    load.then((item) => {
       setFoodItem(item);
-      // Figma 예시처럼 마지막 재료(대파) 하나만 기본 해제된 상태로 시작한다
+      // Figma 예시처럼 마지막 재료 하나만 기본 해제된 상태로 시작한다 (재료가 있을 때만)
       setSelectedIds(item.ingredients.slice(0, -1).map((ingredient) => ingredient.id));
     });
-  }, []);
+  }, [foodName, photoUri]);
 
   const toggleIngredient = (id: string) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
@@ -76,12 +85,18 @@ export default function FoodResultScreen() {
         </View>
 
         <ThemedView type="surfaceCard" style={styles.photoCard}>
-          <ThemedView type="brandSoft" style={styles.photoIconWrap}>
-            <CameraIcon size={24} color={theme.brandText} />
-          </ThemedView>
-          <ThemedText type="caption" themeColor="textMuted" style={styles.photoLabel}>
-            촬영한 사진
-          </ThemedText>
+          {photoUri ? (
+            <Image source={{ uri: photoUri }} style={styles.photoImage} contentFit="cover" />
+          ) : (
+            <>
+              <ThemedView type="brandSoft" style={styles.photoIconWrap}>
+                <CameraIcon size={24} color={theme.brandText} />
+              </ThemedView>
+              <ThemedText type="caption" themeColor="textMuted" style={styles.photoLabel}>
+                촬영한 사진
+              </ThemedText>
+            </>
+          )}
         </ThemedView>
 
         {foodItem ? (
@@ -205,6 +220,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    overflow: 'hidden',
+  },
+  photoImage: {
+    width: '100%',
+    height: '100%',
   },
   photoIconWrap: {
     width: 44,
