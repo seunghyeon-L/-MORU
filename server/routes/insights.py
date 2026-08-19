@@ -5,8 +5,11 @@
 """
 
 from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
+from db_session import get_db
 from deps import device_id, ex
+from services import mytable, users
 
 router = APIRouter(tags=["홈·분석"])
 
@@ -122,25 +125,11 @@ async def patterns(dev: str = Depends(device_id)):
         "saved_recommendations": [{"kind": "recipe", "ref_id": 3, "title": "속 편한 녹차라떼"}],
     }),
 )
-async def mytable(dev: str = Depends(device_id)):
+async def mytable_view(dev: str = Depends(device_id), db: Session = Depends(get_db)):
     """headline 의 개수는 되찾은 개수다.
 
     제한이 아니라 확장을 세기 때문에 원칙 ② 의 "점수" 가 아니다.
     다만 프론트는 이걸 게이지나 진행 바로 그리지 않는다. 문장으로만 쓴다.
     """
-    # TODO(A-6)
-    return {
-        "headline": "처음보다 6가지를 되찾았어요",
-        "sub": "피하던 음식 8가지 중 6가지를 다시 드실 수 있게 됐어요.",
-        "sections": [
-            {"status": "safe", "title": "안심하고 먹는 음식",
-             "items": [{"id": 1, "label": "우유"}, {"id": 2, "label": "밀빵"},
-                       {"id": 3, "label": "콩류"}, {"id": 4, "label": "커피"}]},
-            {"status": "candidate", "title": "확인된 후보",
-             "items": [{"id": 5, "label": "양파", "note": "3번 중 2번 반응", "hint": "양을 줄여보세요"}]},
-            {"status": "to_try", "title": "다시 먹어볼 음식",
-             "items": [{"id": 6, "label": "마늘", "note": "아직 확인 전",
-                        "action": {"label": "확인해보기", "screen": "F1", "ingredient_id": 13}}]},
-        ],
-        "saved_recommendations": [{"kind": "recipe", "ref_id": 3, "title": "속 편한 녹차라떼"}],
-    }
+    u = users.get_or_create(db, dev)
+    return mytable.view(db, u.id)
