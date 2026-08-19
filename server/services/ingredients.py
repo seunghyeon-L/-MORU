@@ -44,6 +44,21 @@ def match_many(db: Session, names: list[str]) -> list[Ingredient]:
     return matched
 
 
+def get_or_create(db: Session, name: str) -> Ingredient:
+    """D2 '+ 직접 추가' — 마스터에 없는 재료 이름.
+
+    meal_ingredients.ingredient_id 가 NOT NULL FK 라 이름만 저장할 자리가 없다.
+    최소 정보(별칭·FODMAP 없음)로 마스터에 새로 만들어 연결한다.
+    """
+    name = name.strip()
+    ing = db.query(Ingredient).filter(Ingredient.name == name).one_or_none()
+    if ing is None:
+        ing = Ingredient(name=name, aliases=[])
+        db.add(ing)
+        db.flush()
+    return ing
+
+
 def find_food(db: Session, food_name: str) -> Food | None:
     """foods.name 에 맞춰본다. 못 찾으면 None (마스터에 없는 음식일 수 있다)."""
     name = food_name.strip()

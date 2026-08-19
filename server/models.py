@@ -26,6 +26,10 @@ ChallengeStatus = ENUM("proposed", "eliminating", "testing", "done", "abandoned"
                        name="challenge_status", create_type=False)
 AttemptResult = ENUM("pending", "reaction", "no_reaction", "skipped",
                      name="attempt_result", create_type=False)
+PortionSize = ENUM("half", "one", "one_and_half_plus",
+                   name="portion_size", create_type=False)
+InputMethod = ENUM("photo", "text", "search",
+                   name="input_method", create_type=False)
 
 
 class User(Base):
@@ -96,6 +100,33 @@ class FoodIngredient(Base):
         BigInteger, ForeignKey("ingredients.id", ondelete="CASCADE"), primary_key=True)
     grams: Mapped[float | None] = mapped_column(Numeric(7, 2))
     in_broth: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class Meal(Base):
+    __tablename__ = "meals"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
+    food_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("foods.id"))
+    food_name: Mapped[str] = mapped_column(Text)
+    eaten_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    portion: Mapped[str] = mapped_column(PortionSize)
+    ate_broth: Mapped[bool | None] = mapped_column(Boolean)
+    method: Mapped[str] = mapped_column(InputMethod)
+    photo_path: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class MealIngredient(Base):
+    """D2 에서 사용자가 최종 확정한 재료. AI 가 뽑은 것과 다를 수 있다."""
+
+    __tablename__ = "meal_ingredients"
+
+    meal_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("meals.id", ondelete="CASCADE"), primary_key=True)
+    ingredient_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("ingredients.id"), primary_key=True)
+    added_by_user: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class UserAllergy(Base):

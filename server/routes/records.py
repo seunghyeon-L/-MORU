@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from db_session import get_db
 from deps import device_id, ex
-from models import SafetyScreening
+from models import Ingredient, Meal, MealIngredient, SafetyScreening
 from schemas import IdentifyIn, MealIn, ResolveIn, SymptomIn
 from services import ingredients as ingredients_svc
 from services import llm, safety, users
@@ -130,11 +130,38 @@ async def identify_photo(photo: UploadFile = File(...), dev: str = Depends(devic
     summary="D2 확정 → D4 기록 완료",
     responses=ex({"meal_id": 91, "has_insight": True}),
 )
-async def create_meal(body: MealIn, dev: str = Depends(device_id)):
+async def create_meal(body: MealIn, dev: str = Depends(device_id), db: Session = Depends(get_db)):
     """has_insight 가 false 면 D3 를 건너뛰고 바로 D4 로 간다."""
-    # TODO(B-3): meals / meal_ingredients 저장
+    u = users.get_or_create(db, dev)
+    meal = Meal(
+        user_id=u.id, food_id=body.food_id, food_name=body.food_name,
+        eaten_at=body.eaten_at, portion=body.portion, ate_broth=body.ate_broth,
+        method=body.method,
+    )
+    db.add(meal)
+    db.flush()  # meal.id 를 받아와야 meal_ingredients 를 연결할 수 있다
+
+    valid_ids = {
+        row[0] for row in
+        db.query(Ingredient.id).filter(Ingredient.id.in_(body.ingredient_ids)).all()
+    } if body.ingredient_ids else set()
+
+    linked: set[int] = set()
+    for iid in body.ingredient_ids:
+        if iid in valid_ids and iid not in linked:
+            db.add(MealIngredient(meal_id=meal.id, ingredient_id=iid, added_by_user=False))
+            linked.add(iid)
+
+    for name in body.custom_ingredients:
+        ing = ingredients_svc.get_or_create(db, name)
+        if ing.id not in linked:
+            db.add(MealIngredient(meal_id=meal.id, ingredient_id=ing.id, added_by_user=True))
+            linked.add(ing.id)
+
+    db.commit()
+
     # TODO(A-3): 저장 직후 meal_fodmap 6축 계산
-    return {"meal_id": 91, "has_insight": True}
+    return {"meal_id": meal.id, "has_insight": bool(linked)}
 
 
 @router.get(
