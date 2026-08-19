@@ -6,8 +6,10 @@
 
 import base64
 from datetime import datetime, timezone
+from io import BytesIO
 
 from fastapi import APIRouter, Depends, File, UploadFile
+from PIL import Image
 from sqlalchemy.orm import Session
 
 from db_session import get_db
@@ -61,6 +63,25 @@ _IDENTIFY_EMPTY = {
     "food_id": None, "food_name": "", "has_broth": False,
     "ingredients": [], "confidence": "low",
 }
+
+_MAX_IMAGE_SIDE = 1024   # Vision 은 이 이상 키워봐야 인식률이 안 오르고 토큰만 늘어난다
+
+
+def _downscale(raw: bytes) -> bytes:
+    """업로드 사진을 긴 변 1024px JPEG 로 줄인다.
+
+    폰 원본은 수 MB → base64 로 그대로 보내면 호출당 토큰·지연이 크게 뛴다.
+    못 열면(손상·미지원 포맷) 원본을 그대로 돌려준다.
+    """
+    try:
+        img = Image.open(BytesIO(raw))
+        img = img.convert("RGB")
+        img.thumbnail((_MAX_IMAGE_SIDE, _MAX_IMAGE_SIDE))
+        buf = BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+        return buf.getvalue()
+    except Exception:                       # noqa: BLE001
+        return raw
 
 
 def _resolve(db: Session, extracted: dict) -> dict:
@@ -117,7 +138,8 @@ async def identify_photo(photo: UploadFile = File(...), dev: str = Depends(devic
     if not raw:
         return _IDENTIFY_EMPTY
 
-    data_url = f"data:{photo.content_type or 'image/jpeg'};base64,{base64.b64encode(raw).decode()}"
+    jpeg = _downscale(raw)  # 폰 사진은 수 MB — 그대로 보내면 비용·지연이 크다
+    data_url = f"data:image/jpeg;base64,{base64.b64encode(jpeg).decode()}"
     r = llm.structured(
         db, purpose="identify_ingredients_photo", model=llm.CLASSIFIER_MODEL,
         system=_IDENTIFY_SYSTEM, user="이 사진 속 음식과 재료를 알려줘.",
