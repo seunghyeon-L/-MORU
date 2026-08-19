@@ -14,6 +14,10 @@
 | 기능 정의서 (표·화면 단위) | `spec-04-function-list.md` |
 | 디자인 · 피그마 · 컬러 | `design-01-figma-and-system.md` |
 | 개발 · 서버 · API 키 | `dev-01-stack-and-infra.md` |
+| DB 스키마 · 백엔드 분담 | `dev-02-db-and-workshare.md` |
+| **API 계약** (프론트가 볼 것) | `dev-03-api-contract.md` |
+| **챗봇 안전 테스트** | `dev-04-safety-test.md` |
+| **개발하며 신경 쓴 것** (인사이트) | `insights-02-engineering.md` |
 | **교수님 자문 원문** | `expert-02-professor-feedback.md` |
 | 교수님께 물어볼 질문 | `expert-01-questions.md` |
 | **설문 원본 61명** | `data/survey-raw-2026-08.md` ⚠️ 재수집 불가 |
