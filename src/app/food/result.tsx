@@ -61,7 +61,6 @@ export default function FoodResultScreen() {
     setAddingCustom(false);
   };
 
-  const canConfirm = portion !== undefined && hasSoup !== undefined;
   const allIngredients = foodItem ? [...foodItem.ingredients, ...customIngredients] : [];
 
   return (
@@ -176,7 +175,6 @@ export default function FoodResultScreen() {
 
       <BottomButton
         label="확인"
-        disabled={!canConfirm}
         onPress={() => router.push('/food/ingredient')}
       />
     </ThemedView>
