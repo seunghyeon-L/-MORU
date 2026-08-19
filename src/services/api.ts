@@ -9,7 +9,6 @@
  * 모든 함수는 Promise 를 반환한다.
  */
 
-import { mockAnalysisResult } from '@/mock/analysis';
 import {
   mockFoodItems,
   mockFoodRecords,
@@ -18,16 +17,13 @@ import {
   mockRecipe,
   mockSubstitutions,
 } from '@/mock/foods';
-import { mockReintroductionPlan } from '@/mock/reintroduction';
 import { mockSymptomRecords } from '@/mock/symptoms';
-import { mockOnboardingData } from '@/mock/user';
-import type { AnalysisResult, PatternsResponse } from '@/types/analysis';
+import type { PatternsResponse } from '@/types/analysis';
 import type {
   ChatSendRequest,
   ChatSendResponse,
   FoodItem,
   FoodRecord,
-  Ingredient,
   IngredientSubstitution,
   MealCreateRequest,
   MealCreateResponse,
@@ -49,7 +45,6 @@ import type {
   ChallengeSaveResponse,
   ChallengeSuggestion,
   IngredientContains,
-  ReintroductionPlan,
 } from '@/types/reintroduction';
 import type { SymptomLogRequest, SymptomLogResponse, SymptomRecord } from '@/types/symptom';
 import type { MeResponse } from '@/types/user';
@@ -68,10 +63,6 @@ function ok<T>(value: T): Promise<T> {
 /* 사용자 / 온보딩                                                      */
 /* ------------------------------------------------------------------ */
 
-export function getOnboardingData(): Promise<OnboardingData> {
-  return ok(mockOnboardingData);
-}
-
 export function saveOnboardingData(data: OnboardingData): Promise<OnboardingData> {
   // TODO: POST /onboarding/profile — nickname 입력 UI, frequency 6단계 매핑, allergies/avoided_foods/
   // baseline_symptoms 서버 vocabulary가 확정되기 전까지는 실제 호출로 바꾸지 않는다 (BLOCKED)
@@ -89,11 +80,6 @@ export function getMe(): Promise<MeResponse> {
 
 export function getFoodRecords(): Promise<FoodRecord[]> {
   return ok(mockFoodRecords);
-}
-
-export function createFoodRecord(record: FoodRecord): Promise<FoodRecord> {
-  // TODO: POST /food-records
-  return ok(record);
 }
 
 /** D1 텍스트 입력(메뉴 검색/직접 입력) → 재료 식별 */
@@ -120,12 +106,6 @@ export function createMeal(payload: MealCreateRequest): Promise<MealCreateRespon
 /** D3 참고 정보와 대체안. observation 이 null 이면 카드를 그리지 않는다 */
 export function getMealInsight(mealId: number): Promise<MealInsightResponse> {
   return apiRequest<MealInsightResponse>(`/meals/${mealId}/insight`);
-}
-
-/** food/ingredient — 특정 음식의 재료 목록 (H4 대체안 화면에서 사용) */
-export function getIngredients(foodItemId: string): Promise<Ingredient[]> {
-  const item = mockFoodItems.find((food) => food.id === foodItemId);
-  return ok(item?.ingredients ?? []);
 }
 
 /** food/alternative (H4) — id로 특정 음식 항목 조회 */
@@ -184,10 +164,6 @@ export function logSymptom(payload: SymptomLogRequest): Promise<SymptomLogRespon
 /* ------------------------------------------------------------------ */
 /* 분석                                                                 */
 /* ------------------------------------------------------------------ */
-
-export function getAnalysis(): Promise<AnalysisResult> {
-  return ok(mockAnalysisResult);
-}
 
 /** E3 개인화 패턴 분석. summary 가 null 이면 아직 근거가 부족하다는 뜻이며 정상 상태다 */
 export function getPatterns(): Promise<PatternsResponse> {
@@ -255,15 +231,6 @@ export function getChallengeResult(challengeId: number): Promise<ChallengeResult
 /** F4 "나의 식탁에 저장하기" 버튼에서만 호출한다 */
 export function saveChallenge(challengeId: number): Promise<ChallengeSaveResponse> {
   return apiRequest<ChallengeSaveResponse>(`/challenges/${challengeId}/save`, { method: 'POST' });
-}
-
-export function getReintroductionPlan(): Promise<ReintroductionPlan | null> {
-  return ok(mockReintroductionPlan);
-}
-
-export function saveReintroductionPlan(plan: ReintroductionPlan): Promise<ReintroductionPlan> {
-  // TODO: POST /reintroduction-plans
-  return ok(plan);
 }
 
 /* ------------------------------------------------------------------ */

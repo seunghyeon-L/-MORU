@@ -16,6 +16,7 @@ import type { MealInsightResponse } from '@/types/food';
 
 type ForwardParams = {
   meal_id?: string;
+  food_id?: string;
   food_name?: string;
   eaten_at?: string;
   portion?: string;
@@ -27,12 +28,16 @@ type ForwardParams = {
  * GET /meals/{meal_id}/insight 응답만 사용한다(D2에서 전달받은 meal_id 기준).
  * observation 이 null 이면 카드를 그리지 않고, caveat 는 안전장치이므로 항상 표시한다.
  * suggestions 는 서버가 준 배열/rank 순서를 그대로 쓴다 — 프론트에서 순위를 다시 계산하지 않는다.
+ *
+ * food_id 는 D2 → D3 → D4 로만 유실 없이 전달해두고 이 화면에서는 아직 쓰지 않는다.
+ * H4(GET /foods/{food_id}/alternatives)로 들어가는 명확한 CTA가 이 화면에 없어
+ * H4/H5 연결은 보류 상태다(BLOCKED) — 진입 UX가 결정되면 이 food_id를 그대로 쓰면 된다.
  */
 export default function FoodIngredientScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
-  const { meal_id, food_name, eaten_at, portion, ingredients } =
+  const { meal_id, food_id, food_name, eaten_at, portion, ingredients } =
     useLocalSearchParams<ForwardParams>();
 
   const mealId = Number(meal_id);
@@ -57,7 +62,7 @@ export default function FoodIngredientScreen() {
   const finish = () =>
     router.push({
       pathname: '/food/complete',
-      params: { meal_id, food_name, eaten_at, portion, ingredients },
+      params: { meal_id, food_id, food_name, eaten_at, portion, ingredients },
     });
 
   return (

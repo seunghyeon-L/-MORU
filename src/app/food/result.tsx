@@ -138,6 +138,7 @@ export default function FoodResultScreen() {
 
       const forwardParams = {
         meal_id: String(result.meal_id),
+        food_id: String(identify.food_id),
         food_name: identify.food_name,
         eaten_at: eatenAt,
         portion,

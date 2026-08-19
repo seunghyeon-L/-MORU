@@ -127,7 +127,7 @@ export type MealInsightResponse = {
 };
 
 /* ------------------------------------------------------------------ */
-/* 대체 제안 (food/alternative)                                         */
+/* 대체 제안 카드 공용 타입 (D3/H3/H4 에서 AlternativeCard 컴포넌트가 쓴다) */
 /* ------------------------------------------------------------------ */
 
 export type AlternativeKind = 'menu' | 'ingredient' | 'method';

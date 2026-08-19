@@ -6,7 +6,6 @@
  */
 
 import type {
-  Alternative,
   FoodItem,
   FoodRecord,
   Ingredient,
@@ -135,37 +134,6 @@ export const mockFoodRecords: FoodRecord[] = [
     inputMethod: 'photo',
     portion: 'small',
     cookingMethod: 'stir-fried',
-  },
-];
-
-/* ------------------------------------------------------------------ */
-/* 대체 제안 (food/alternative)                                         */
-/* ------------------------------------------------------------------ */
-
-export const mockAlternatives: Alternative[] = [
-  {
-    id: 'alt-1',
-    kind: 'method',
-    title: '소량부터 시도해보기',
-    description: '평소보다 조금만',
-  },
-  {
-    id: 'alt-2',
-    kind: 'method',
-    title: '반 그릇만 드시기',
-    description: '국물은 조금, 건더기 위주로',
-  },
-  {
-    id: 'alt-3',
-    kind: 'ingredient',
-    title: '마늘 빼달라고 요청하기',
-    description: '식당에서도 대부분 가능해요',
-  },
-  {
-    id: 'alt-4',
-    kind: 'menu',
-    title: '다른 메뉴 골라보기',
-    description: '맑은 국 · 된장찌개',
   },
 ];
 

@@ -12,7 +12,6 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
 import * as api from '@/services/api';
-import type { AnalysisResult } from '@/types/analysis';
 import type { FoodRecord } from '@/types/food';
 import { EMPTY_ONBOARDING_DATA, type OnboardingData } from '@/types/onboarding';
 import type { SymptomRecord } from '@/types/symptom';
@@ -22,7 +21,6 @@ export type MoruState = {
   onboarding: OnboardingData;
   foodRecords: FoodRecord[];
   symptomRecords: SymptomRecord[];
-  analysis: AnalysisResult | null;
   /** api 로부터 최초 데이터를 받아왔는지 */
   loaded: boolean;
 };
@@ -31,7 +29,6 @@ const initialState: MoruState = {
   onboarding: EMPTY_ONBOARDING_DATA,
   foodRecords: [],
   symptomRecords: [],
-  analysis: null,
   loaded: false,
 };
 
@@ -64,18 +61,15 @@ let loadPromise: Promise<void> | null = null;
 function loadOnce(): Promise<void> {
   if (loadPromise) return loadPromise;
 
-  loadPromise = Promise.all([
-    api.getFoodRecords(),
-    api.getSymptomRecords(),
-    api.getAnalysis(),
-  ]).then(([foodRecords, symptomRecords, analysis]) => {
-    setState({
-      foodRecords,
-      symptomRecords,
-      analysis,
-      loaded: true,
-    });
-  });
+  loadPromise = Promise.all([api.getFoodRecords(), api.getSymptomRecords()]).then(
+    ([foodRecords, symptomRecords]) => {
+      setState({
+        foodRecords,
+        symptomRecords,
+        loaded: true,
+      });
+    },
+  );
 
   return loadPromise;
 }
@@ -107,11 +101,6 @@ export function useMoruData() {
     await api.saveOnboardingData(completed);
   }, []);
 
-  const addFoodRecord = useCallback(async (record: FoodRecord) => {
-    const saved = await api.createFoodRecord(record);
-    setState({ foodRecords: [saved, ...state.foodRecords] });
-  }, []);
-
   const addSymptomRecord = useCallback(async (record: SymptomRecord) => {
     const saved = await api.createSymptomRecord(record);
     setState({ symptomRecords: [saved, ...state.symptomRecords] });
@@ -122,7 +111,6 @@ export function useMoruData() {
     updateOnboarding,
     resetOnboarding,
     completeOnboarding,
-    addFoodRecord,
     addSymptomRecord,
   };
 }
