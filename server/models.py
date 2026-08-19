@@ -194,15 +194,6 @@ class MealFodmap(Base):
     # 0.0 = 전부 마스터 그램 / 1.0 = 전부 카테고리 평균으로 때움
     estimated_ratio: Mapped[float] = mapped_column(Numeric(4, 3), default=0)
 
-class IngredientFodmap(Base):
-    __tablename__ = "ingredient_fodmap"
-
-    ingredient_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("ingredients.id", ondelete="CASCADE"), primary_key=True)
-    axis: Mapped[str] = mapped_column(Text, primary_key=True)
-    grams_per_100g: Mapped[float] = mapped_column(Numeric(6, 3))
-    source: Mapped[str | None] = mapped_column(Text)
-
 
 class Substitution(Base):
     """H3 성분 대체 방법."""
