@@ -1,0 +1,114 @@
+<svg viewBox="0 0 900 580" xmlns="http://www.w3.org/2000/svg" font-family="Pretendard, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif">
+
+  <rect width="900" height="580" fill="#FAF8F5"/>
+
+  <!-- ── Header ────────────────────────────────────────── -->
+  <text x="60" y="48" font-size="22" font-weight="700" fill="#1E2422">이만큼 · 로고 컨셉</text>
+  <text x="60" y="72" font-size="13" fill="#8A928F">대괄호 사이의 공간 — 양쪽 끝만 표시하고 가운데를 비운다. 주인공은 획이 아니라 사이의 여백.</text>
+
+  <!-- ── Row A · 심볼 ──────────────────────────────────── -->
+  <text x="60" y="106" font-size="12" font-weight="600" fill="#1E2422" letter-spacing="1">심볼</text>
+
+  <g fill="none" stroke="#16706B" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+    <!-- 1. 기본 -->
+    <path d="M74 130 H60 V190 H74"/>
+    <path d="M186 130 H200 V190 H186"/>
+    <!-- 2. 채워진 상태 -->
+    <path d="M364 130 H350 V190 H364"/>
+    <path d="M476 130 H490 V190 H476"/>
+    <!-- 3. 확장된 상태 (괄호가 벌어짐) -->
+    <path d="M654 130 H640 V190 H654"/>
+    <path d="M806 130 H820 V190 H806"/>
+  </g>
+
+  <!-- 2. 오늘 채운 양 -->
+  <rect x="366" y="151" width="62" height="18" rx="9" fill="#16706B"/>
+
+  <!-- 3. 확장: 이전 한계선(점선) + 새로 늘어난 여유(살구) -->
+  <rect x="656" y="151" width="62" height="18" rx="9" fill="#16706B"/>
+  <path d="M768 134 V186" stroke="#2E9A93" stroke-width="2" stroke-dasharray="4 5" opacity="0.55"/>
+  <rect x="772" y="153" width="34" height="14" rx="7" fill="#E9A178"/>
+
+  <text x="60"  y="216" font-size="12" fill="#8A928F">기본 — 내 한계선</text>
+  <text x="350" y="216" font-size="12" fill="#8A928F">오늘 채운 양 · 남은 여유</text>
+  <text x="640" y="216" font-size="12" fill="#8A928F">역치가 오르면 괄호가 벌어진다</text>
+  <text x="640" y="234" font-size="11" fill="#C4956F">점선 = 이전 한계선 / 살구 = 늘어난 여유</text>
+
+  <!-- ── Row B · 6축 프로필 응용 ───────────────────────── -->
+  <text x="60" y="286" font-size="12" font-weight="600" fill="#1E2422" letter-spacing="1">응용 — 그룹별 한계선 프로필</text>
+  <text x="240" y="286" font-size="11" fill="#8A928F">심볼의 문법이 그대로 데이터 시각화가 된다</text>
+
+  <g font-size="12" fill="#5C6663">
+    <text x="60" y="316">유당</text>
+    <text x="60" y="340">과당</text>
+    <text x="60" y="364">프럭탄</text>
+    <text x="60" y="388">GOS</text>
+    <text x="60" y="412">소르비톨</text>
+    <text x="60" y="436">만니톨</text>
+  </g>
+
+  <g fill="none" stroke="#16706B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M156 306 H150 V318 H156"/> <path d="M394 306 H400 V318 H394"/>
+    <path d="M156 330 H150 V342 H156"/> <path d="M324 330 H330 V342 H324"/>
+    <path d="M156 354 H150 V366 H156"/> <path d="M264 354 H270 V366 H264"/>
+    <path d="M156 378 H150 V390 H156"/> <path d="M304 378 H310 V390 H304"/>
+    <path d="M156 402 H150 V414 H156"/> <path d="M234 402 H240 V414 H234"/>
+    <path d="M156 426 H150 V438 H156"/> <path d="M284 426 H290 V438 H284"/>
+  </g>
+
+  <g fill="#16706B">
+    <rect x="158" y="308" width="40" height="8" rx="4"/>
+    <rect x="158" y="332" width="62" height="8" rx="4"/>
+    <rect x="158" y="356" width="92" height="8" rx="4"/>
+    <rect x="158" y="380" width="50" height="8" rx="4"/>
+    <rect x="158" y="404" width="30" height="8" rx="4"/>
+    <rect x="158" y="428" width="46" height="8" rx="4"/>
+  </g>
+
+  <text x="420" y="360" font-size="11" fill="#8A928F">한계선도 사람마다 다르고,</text>
+  <text x="420" y="378" font-size="11" fill="#8A928F">오늘 채운 양도 그룹마다 다르다.</text>
+  <text x="420" y="396" font-size="11" fill="#8A928F">‘프럭탄만 거의 찬 날’이 한눈에 보인다.</text>
+
+  <!-- ── Row C · 워드마크 / 앱 아이콘 / 컬러 ───────────── -->
+  <text x="60" y="482" font-size="12" font-weight="600" fill="#1E2422" letter-spacing="1">워드마크 · 앱 아이콘 · 컬러</text>
+
+  <!-- 워드마크 -->
+  <g fill="none" stroke="#16706B" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M69 504 H61 V534 H69"/>
+    <path d="M117 504 H125 V534 H117"/>
+  </g>
+  <rect x="71" y="514" width="24" height="10" rx="5" fill="#16706B"/>
+  <text x="140" y="528" font-size="26" font-weight="600" fill="#1E2422" letter-spacing="2">이만큼</text>
+
+  <!-- 앱 아이콘 -->
+  <rect x="250" y="490" width="76" height="76" rx="20" fill="#16706B"/>
+  <g fill="none" stroke="#FAF8F5" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M274 515 H266 V541 H274"/>
+    <path d="M302 515 H310 V541 H302"/>
+  </g>
+  <rect x="272" y="523" width="16" height="10" rx="5" fill="#FAF8F5"/>
+
+  <!-- 컬러 스와치 -->
+  <g stroke="#E2DDD6" stroke-width="1">
+    <rect x="380" y="490" width="86" height="44" rx="8" fill="#16706B"/>
+    <rect x="478" y="490" width="86" height="44" rx="8" fill="#2E9A93"/>
+    <rect x="576" y="490" width="86" height="44" rx="8" fill="#E9A178"/>
+    <rect x="674" y="490" width="86" height="44" rx="8" fill="#FAF8F5"/>
+    <rect x="772" y="490" width="86" height="44" rx="8" fill="#1E2422"/>
+  </g>
+  <g font-size="11" fill="#1E2422" font-weight="600">
+    <text x="380" y="552">#16706B</text>
+    <text x="478" y="552">#2E9A93</text>
+    <text x="576" y="552">#E9A178</text>
+    <text x="674" y="552">#FAF8F5</text>
+    <text x="772" y="552">#1E2422</text>
+  </g>
+  <g font-size="10" fill="#8A928F">
+    <text x="380" y="568">Primary</text>
+    <text x="478" y="568">Light · 다크모드</text>
+    <text x="576" y="568">확장의 순간만</text>
+    <text x="674" y="568">Background</text>
+    <text x="772" y="568">Text</text>
+  </g>
+
+</svg>

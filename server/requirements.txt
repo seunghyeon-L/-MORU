@@ -1,0 +1,26 @@
+# MORU 백엔드 의존성
+# 설치:  pip install -r requirements.txt
+
+# 웹 프레임워크
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+python-multipart==0.0.20        # 사진 업로드(multipart) 처리
+
+# 데이터 검증 · 스키마
+pydantic==2.13.4
+pydantic-settings==2.7.1
+
+# DB
+psycopg2-binary==2.9.12
+SQLAlchemy==2.0.36
+alembic==1.14.0                 # 스키마 마이그레이션 (팀 간 DB 동기화용)
+
+# LLM
+openai==3.3.0
+instructor==1.7.2               # 구조화 출력 + 검증 실패 시 자동 재시도
+
+# 설정
+python-dotenv==1.2.3
+
+# 이미지 (서버 측 보조 처리)
+Pillow==11.1.0
