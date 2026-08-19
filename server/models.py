@@ -164,6 +164,75 @@ class SymptomContext(Base):
     factor: Mapped[str] = mapped_column(Text, primary_key=True)
 
 
+class IngredientFodmap(Base):
+    __tablename__ = "ingredient_fodmap"
+
+    ingredient_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("ingredients.id", ondelete="CASCADE"), primary_key=True)
+    axis: Mapped[str] = mapped_column(Text, primary_key=True)
+    grams_per_100g: Mapped[float] = mapped_column(Numeric(6, 3))
+    source: Mapped[str | None] = mapped_column(Text)
+
+
+class Substitution(Base):
+    """H3 성분 대체 방법."""
+
+    __tablename__ = "substitutions"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    ingredient_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("ingredients.id", ondelete="CASCADE"))
+    replacement: Mapped[str] = mapped_column(Text)
+    alt_text: Mapped[str | None] = mapped_column(Text)
+    rank: Mapped[int] = mapped_column(SmallInteger, default=1)
+
+
+class Recipe(Base):
+    """H2 대체 레시피."""
+
+    __tablename__ = "recipes"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    title: Mapped[str] = mapped_column(Text)
+    servings: Mapped[str | None] = mapped_column(Text)
+    tip: Mapped[str | None] = mapped_column(Text)
+
+
+class RecipeItem(Base):
+    __tablename__ = "recipe_items"
+
+    recipe_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("recipes.id", ondelete="CASCADE"), primary_key=True)
+    seq: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(Text)
+    amount: Mapped[str | None] = mapped_column(Text)
+    optional: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class MenuAlternative(Base):
+    """H5 대체 메뉴."""
+
+    __tablename__ = "menu_alternatives"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    food_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("foods.id", ondelete="CASCADE"))
+    alt_name: Mapped[str] = mapped_column(Text)
+    why: Mapped[str | None] = mapped_column(Text)
+    rank: Mapped[int] = mapped_column(SmallInteger, default=1)
+
+
+class SavedRecommendation(Base):
+    """G '저장한 추천'."""
+
+    __tablename__ = "saved_recommendations"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
+    kind: Mapped[str] = mapped_column(Text)
+    ref_id: Mapped[int] = mapped_column(BigInteger)
+    saved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class UserAllergy(Base):
     __tablename__ = "user_allergies"
 
