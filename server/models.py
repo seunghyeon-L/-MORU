@@ -84,6 +84,16 @@ class UserAllergy(Base):
     label: Mapped[str] = mapped_column(Text, primary_key=True)
 
 
+class BaselineSymptom(Base):
+    """B4 초기 증상 문진. 나중에 얼마나 나아졌는지 비교하는 기준선."""
+
+    __tablename__ = "baseline_symptoms"
+
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    label: Mapped[str] = mapped_column(Text, primary_key=True)
+
+
 class MyTableItem(Base):
     __tablename__ = "my_table_items"
 

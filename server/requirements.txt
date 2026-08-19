@@ -12,7 +12,7 @@ pydantic-settings==2.7.1
 
 # DB
 psycopg2-binary==2.9.12
-SQLAlchemy==2.0.36
+SQLAlchemy==2.0.52
 alembic==1.14.0                 # 스키마 마이그레이션 (팀 간 DB 동기화용)
 
 # LLM

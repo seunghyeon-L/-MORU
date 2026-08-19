@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from db_session import get_db
 from deps import device_id, ex
-from models import SafetyScreening, UserAllergy
+from models import BaselineSymptom, SafetyScreening, UserAllergy
 from schemas import ProfileIn, SafetyIn
 from services import mytable, safety, users
 
@@ -98,12 +98,16 @@ async def profile(body: ProfileIn, dev: str = Depends(device_id), db: Session = 
     for label in body.allergies:
         if not db.get(UserAllergy, (u.id, label)):
             db.add(UserAllergy(user_id=u.id, label=label))
+
+    for label in body.baseline_symptoms:
+        if not db.get(BaselineSymptom, (u.id, label)):
+            db.add(BaselineSymptom(user_id=u.id, label=label))
+
     db.commit()
 
     # A-6 — 알레르기·셀리악은 여기서 걸러진다. 나의 식탁에 아예 안 들어간다.
     mytable.seed_from_onboarding(db, u.id, body.avoided_foods, body.allergies, body.celiac)
 
-    # TODO(B-2): baseline_symptoms 저장
     return {"user_id": u.id, "onboarded": True}
 
 
