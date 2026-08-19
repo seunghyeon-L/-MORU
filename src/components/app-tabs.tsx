@@ -17,8 +17,8 @@ export default function AppTabs() {
   return (
     <NativeTabs
       backgroundColor={colors.background}
-      indicatorColor={colors.backgroundElement}
-      labelStyle={{ selected: { color: colors.text } }}>
+      indicatorColor="transparent"
+      labelStyle={{ selected: { color: colors.brand } }}>
       <NativeTabs.Trigger name="record">
         <NativeTabs.Trigger.Label>기록</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
