@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { FoodInputSheet } from '@/components/food/FoodInputSheet';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useMoruData } from '@/hooks/useMoruData';
@@ -22,6 +23,7 @@ export default function HomeScreen() {
 
   const [nickname, setNickname] = useState<string | undefined>();
   const [suggestionDismissed, setSuggestionDismissed] = useState(false);
+  const [foodSheetVisible, setFoodSheetVisible] = useState(false);
 
   useEffect(() => {
     api.getUserProfile().then((profile) => setNickname(profile.nickname));
@@ -108,7 +110,7 @@ export default function HomeScreen() {
 
         <View style={styles.flex} />
 
-        <Pressable onPress={() => router.push('/food/camera')}>
+        <Pressable onPress={() => setFoodSheetVisible(true)}>
           <ThemedView type="brand" style={styles.checkButton}>
             <ThemedText type="button" themeColor="textOnBrand">
               오늘 먹은 것 확인하기
@@ -116,6 +118,8 @@ export default function HomeScreen() {
           </ThemedView>
         </Pressable>
       </ThemedView>
+
+      <FoodInputSheet visible={foodSheetVisible} onClose={() => setFoodSheetVisible(false)} />
     </ScrollView>
   );
 }

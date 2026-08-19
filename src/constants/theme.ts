@@ -26,6 +26,9 @@ export const Colors = {
     textPrimary: '#3A342C',
     textMuted: '#948B7B',
     textOnBrand: '#FFFFFF',
+    /** 증상 기록 카드 등 코랄 계열 포인트 (스크린샷 기준 근사치) */
+    coral: '#C97C6D',
+    coralLight: '#F5E2DD',
   },
   dark: {
     text: '#ffffff',
@@ -44,6 +47,8 @@ export const Colors = {
     textPrimary: '#F5F1E8',
     textMuted: '#A79E8D',
     textOnBrand: '#FFFFFF',
+    coral: '#D99A8C',
+    coralLight: '#3A2C28',
   },
 } as const;
 

@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
+import { CameraIcon } from './common/icons';
 
 import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
@@ -23,52 +24,6 @@ import { Spacing } from '@/constants/theme';
  * - 홈 = "material-symbols:home-outline-rounded" → expo-symbols 로 동일 아이콘 재현.
  */
 const ICON_STROKE = 1.6;
-
-function CameraIcon({ size, color }: { size: number; color: string }) {
-  const s = size / 24;
-  return (
-    <View style={{ width: size, height: size }}>
-      <View
-        style={{
-          position: 'absolute',
-          left: 2 * s,
-          top: 8 * s,
-          width: 20 * s,
-          height: 13 * s,
-          borderRadius: 4 * s,
-          borderWidth: ICON_STROKE,
-          borderColor: color,
-        }}
-      />
-      <View
-        style={{
-          position: 'absolute',
-          left: 6 * s,
-          top: 5 * s,
-          width: 8 * s,
-          height: 5 * s,
-          borderTopLeftRadius: 2 * s,
-          borderTopRightRadius: 2 * s,
-          borderWidth: ICON_STROKE,
-          borderBottomWidth: 0,
-          borderColor: color,
-        }}
-      />
-      <View
-        style={{
-          position: 'absolute',
-          left: 8.5 * s,
-          top: 11 * s,
-          width: 7 * s,
-          height: 7 * s,
-          borderRadius: 3.5 * s,
-          borderWidth: ICON_STROKE,
-          borderColor: color,
-        }}
-      />
-    </View>
-  );
-}
 
 function TableIcon({ size, color }: { size: number; color: string }) {
   const s = size / 24;
