@@ -18,9 +18,9 @@ export function Chip({ label, selected = false, onPress, disabled }: ChipProps) 
 
   const content = (
     <ThemedView
-      type="surfaceCard"
+      type={selected ? 'brand' : 'surfaceCard'}
       style={[styles.chip, { borderColor: selected ? theme.brand : theme.borderSubtle }]}>
-      <ThemedText type="label" themeColor={selected ? 'textPrimary' : 'textSecondary'}>
+      <ThemedText type="label" themeColor={selected ? 'textOnBrand' : 'textSecondary'}>
         {label}
       </ThemedText>
     </ThemedView>

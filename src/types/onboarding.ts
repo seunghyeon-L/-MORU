@@ -78,7 +78,6 @@ export const AVOIDED_FOOD_OPTIONS = [
   { id: 'coffee', label: '커피' },
   { id: 'alcohol', label: '술' },
   { id: 'carbonated', label: '탄산' },
-  { id: 'etc', label: '기타' },
   { id: 'none', label: '없음' },
   { id: 'bread-snack', label: '빵·과자' },
   { id: 'cereal', label: '시리얼' },
@@ -88,6 +87,7 @@ export const AVOIDED_FOOD_OPTIONS = [
   { id: 'ice-cream', label: '아이스크림' },
   { id: 'mushroom', label: '버섯' },
   { id: 'avocado', label: '아보카도' },
+  { id: 'etc', label: '기타' },
 ] as const satisfies readonly Option<string>[];
 
 export type AvoidedFood = (typeof AVOIDED_FOOD_OPTIONS)[number]['id'];

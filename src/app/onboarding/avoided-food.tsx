@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BottomButton } from '@/components/common/BottomButton';
@@ -9,6 +9,7 @@ import { OnboardingHeader } from '@/components/onboarding/OnboardingHeader';
 import { QuestionCard } from '@/components/onboarding/QuestionCard';
 import { ThemedView } from '@/components/themed-view';
 import { useMoruData } from '@/hooks/useMoruData';
+import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
 import { AVOIDED_FOOD_OPTIONS, type AvoidedFood } from '@/types/onboarding';
 
@@ -16,15 +17,26 @@ import { AVOIDED_FOOD_OPTIONS, type AvoidedFood } from '@/types/onboarding';
 export default function AvoidedFoodScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
   const { updateOnboarding } = useMoruData();
   const [selected, setSelected] = useState<AvoidedFood[]>([]);
+  const [etcText, setEtcText] = useState('');
 
   const toggle = (id: AvoidedFood) => {
-    setSelected((prev) => (prev.includes(id) ? prev.filter((food) => food !== id) : [...prev, id]));
+    setSelected((prev) => {
+      const next = prev.includes(id) ? prev.filter((food) => food !== id) : [...prev, id];
+      if (!next.includes('etc')) setEtcText('');
+      return next;
+    });
   };
 
+  const showEtcInput = selected.includes('etc');
+
   const handleNext = () => {
-    updateOnboarding({ avoidedFoods: selected });
+    updateOnboarding({
+      avoidedFoods: selected,
+      avoidedFoodEtcText: showEtcInput && etcText.trim() ? etcText.trim() : undefined,
+    });
     router.push('/onboarding/symptoms');
   };
 
@@ -51,6 +63,23 @@ export default function AvoidedFoodScreen() {
                 />
               ))}
             </View>
+
+            {showEtcInput ? (
+              <TextInput
+                value={etcText}
+                onChangeText={setEtcText}
+                placeholder="피하는 음식을 입력해주세요"
+                placeholderTextColor={theme.textMuted}
+                style={[
+                  styles.etcInput,
+                  {
+                    borderColor: theme.borderSubtle,
+                    color: theme.textPrimary,
+                    backgroundColor: theme.surfaceCard,
+                  },
+                ]}
+              />
+            ) : null}
           </QuestionCard>
 
           <View style={styles.flex} />
@@ -83,6 +112,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  etcInput: {
+    marginTop: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    fontSize: 13.5,
   },
   flex: {
     flex: 1,

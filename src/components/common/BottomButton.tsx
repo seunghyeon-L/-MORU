@@ -15,7 +15,9 @@ export function BottomButton({ secondary, ...primary }: BottomButtonProps) {
   const insets = useSafeAreaInsets();
 
   return (
-    <ThemedView style={[styles.container, { paddingBottom: insets.bottom + Spacing.three }]}>
+    <ThemedView
+      type="onboardingBackground"
+      style={[styles.container, { paddingBottom: insets.bottom + Spacing.three }]}>
       <MORUButton {...primary} />
       {secondary ? <MORUButton variant="ghost" {...secondary} /> : null}
     </ThemedView>

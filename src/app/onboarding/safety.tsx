@@ -28,14 +28,13 @@ export default function SafetyScreen() {
     setSelected((prev) => (prev.includes(id) ? prev.filter((flag) => flag !== id) : [...prev, id]));
   };
 
-  const handleNone = () => {
-    updateOnboarding({ safetyFlags: [] });
-    router.push(needsMedicalReferral([]) ? '/onboarding/medical' : '/onboarding/allergy');
-  };
-
-  const handleAny = () => {
+  /**
+   * 두 버튼 모두 실제 체크된 위험 신호(selected)를 기준으로 판정한다.
+   * 라벨과 무관하게 선택된 항목이 있으면 항상 병원 안내로 이동한다.
+   */
+  const handleContinue = () => {
     updateOnboarding({ safetyFlags: selected });
-    router.push('/onboarding/medical');
+    router.push(needsMedicalReferral(selected) ? '/onboarding/medical' : '/onboarding/allergy');
   };
 
   return (
@@ -68,8 +67,8 @@ export default function SafetyScreen() {
 
         <BottomButton
           label="해당하는 것이 없어요"
-          onPress={handleNone}
-          secondary={{ label: '하나라도 있어요', variant: 'secondary', onPress: handleAny }}
+          onPress={handleContinue}
+          secondary={{ label: '하나라도 있어요', variant: 'secondary', onPress: handleContinue }}
         />
       </ThemedView>
     </ScrollView>

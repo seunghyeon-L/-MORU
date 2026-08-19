@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BottomButton } from '@/components/common/BottomButton';
@@ -28,20 +28,29 @@ export default function AllergyScreen() {
 
   const [selected, setSelected] = useState<Allergy[]>([]);
   const [celiac, setCeliac] = useState<CeliacDiagnosis | undefined>(undefined);
+  const [etcText, setEtcText] = useState('');
 
   const toggle = (id: Allergy) => {
     setSelected((prev) => {
-      if (id === 'none') return prev.includes('none') ? [] : ['none'];
-      const next = prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id];
-      return next.filter((a) => a !== 'none');
+      let next: Allergy[];
+      if (id === 'none') {
+        next = prev.includes('none') ? [] : ['none'];
+      } else {
+        next = prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id];
+        next = next.filter((a) => a !== 'none');
+      }
+      if (!next.includes('etc')) setEtcText('');
+      return next;
     });
   };
 
   const showCeliacQuestion = selected.includes('wheat');
+  const showEtcInput = selected.includes('etc');
 
   const handleNext = () => {
     updateOnboarding({
       allergies: selected,
+      allergyEtcText: showEtcInput && etcText.trim() ? etcText.trim() : undefined,
       celiacDiagnosis: showCeliacQuestion ? celiac : undefined,
     });
     router.push('/onboarding/avoided-food');
@@ -70,6 +79,23 @@ export default function AllergyScreen() {
                 />
               ))}
             </View>
+
+            {showEtcInput ? (
+              <TextInput
+                value={etcText}
+                onChangeText={setEtcText}
+                placeholder="알레르기가 있는 음식을 입력해주세요"
+                placeholderTextColor={theme.textMuted}
+                style={[
+                  styles.etcInput,
+                  {
+                    borderColor: theme.borderSubtle,
+                    color: theme.textPrimary,
+                    backgroundColor: theme.surfaceCard,
+                  },
+                ]}
+              />
+            ) : null}
           </QuestionCard>
 
           {showCeliacQuestion ? (
@@ -138,6 +164,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  etcInput: {
+    marginTop: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    fontSize: 13.5,
   },
   celiacCard: {
     marginTop: 24,

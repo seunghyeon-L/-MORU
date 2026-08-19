@@ -24,13 +24,13 @@ export function Checkbox({ label, checked, onChange, disabled }: CheckboxProps) 
       onPress={() => onChange(!checked)}
       style={({ pressed }) => (pressed || disabled) && styles.dimmed}>
       <ThemedView
-        type="surfaceCard"
+        type={checked ? 'brandSoft' : 'surfaceCard'}
         style={[
           styles.container,
           { borderColor: checked ? theme.brand : theme.brandLight },
         ]}>
         <ThemedView
-          type={checked ? 'brand' : 'brandSoft'}
+          type={checked ? 'brand' : 'surfaceCard'}
           style={[styles.box, { borderColor: checked ? theme.brand : theme.brandLight }]}>
           {checked ? (
             <ThemedText type="label" themeColor="textOnBrand">
@@ -38,7 +38,7 @@ export function Checkbox({ label, checked, onChange, disabled }: CheckboxProps) 
             </ThemedText>
           ) : null}
         </ThemedView>
-        <ThemedText type="bodyS" themeColor="textPrimary">
+        <ThemedText type="bodyS" themeColor={checked ? 'brandText' : 'textPrimary'}>
           {label}
         </ThemedText>
       </ThemedView>
