@@ -237,8 +237,12 @@ def next_candidate(db: Session, user_id: int) -> MyTableItem | None:
     if open_ch:
         return None               # 진행 중인 도전이 있으면 새로 제안하지 않는다
 
+    from sqlalchemy import or_
     return (db.query(MyTableItem)
             .filter(MyTableItem.user_id == user_id,
                     MyTableItem.status == "to_try",
-                    MyTableItem.ingredient_id.isnot(None))
+                    MyTableItem.ingredient_id.isnot(None),
+                    # 홈에서 "나중에" 를 누른 건 기한이 지나야 다시 나온다
+                    or_(MyTableItem.snoozed_until.is_(None),
+                        MyTableItem.snoozed_until <= today()))
             .order_by(MyTableItem.updated_at).first())

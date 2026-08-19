@@ -4,12 +4,13 @@
 여기서 나가는 문장은 전부 "판정하지 않는" 형태여야 한다. 이 파일은 협업자가 건드리지 않는다.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from db_session import get_db
 from deps import device_id, ex
-from services import mytable, users
+from schemas import SnoozeIn
+from services import home, mytable, users
 
 router = APIRouter(tags=["홈·분석"])
 
@@ -34,29 +35,34 @@ router = APIRouter(tags=["홈·분석"])
         ],
     }),
 )
-async def home(dev: str = Depends(device_id)):
+async def home_view(dev: str = Depends(device_id), db: Session = Depends(get_db)):
     """카드는 배열이다. 개수도 순서도 서버가 정한다.
 
     프론트는 type 별 렌더러만 만들고 반복해서 그린다.
     기록이 없는 신규 사용자는 cards 가 빈 배열이다 — 빈 화면 디자인이 필요하다.
+
+    type 종류
+      challenge_progress    진행 중인 도전. action 으로 F3 로 돌아간다
+      challenge_suggestion  도전 제안. dismiss 가 "나중에"
+      schedule_note         시도하기 좋은 때인지
     """
-    # TODO(A-8)
-    return {
-        "greeting": "안녕하세요, 은솔님",
-        "cards": [
-            {"type": "challenge_suggestion",
-             "title": "양파, 다시 시도해볼 만해요",
-             "body": "실제로 시도한 사람의 71%가 그 음식을 되찾았어요.",
-             "action": {"label": "시작할게요", "screen": "F1", "challenge_id": None, "ingredient_id": 12},
-             "dismiss": {"label": "나중에"}},
-            {"type": "weekly_recap",
-             "title": "이번 주 정리해봤어요",
-             "body": "과당이 조금 높았어요. 71%가 매일 드시는 오렌지주스에서 왔습니다."},
-            {"type": "schedule_note",
-             "title": "이번 주는 일정이 여유롭네요",
-             "body": "무언가 새로 시도해보기 좋은 때예요."},
-        ],
-    }
+    u = users.get_or_create(db, dev)
+    return home.build(db, u)
+
+
+@router.post(
+    "/home/cards/suggestion/snooze",
+    summary="홈 도전 제안 카드의 '나중에'",
+    responses=ex({"ok": True, "days": 14}),
+)
+async def snooze(body: SnoozeIn, dev: str = Depends(device_id),
+                 db: Session = Depends(get_db)):
+    """거절이 아니라 미루기다. 2주 뒤에 다시 제안된다."""
+    u = users.get_or_create(db, dev)
+    if not home.snooze(db, u.id, body.ingredient_id):
+        raise HTTPException(404, {"code": "ITEM_NOT_FOUND",
+                                  "message": "해당 항목을 찾지 못했어요."})
+    return {"ok": True, "days": home.SNOOZE_DAYS}
 
 
 @router.get(

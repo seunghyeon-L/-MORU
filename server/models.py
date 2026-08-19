@@ -94,6 +94,7 @@ class MyTableItem(Base):
     status: Mapped[str] = mapped_column(TableStatus)     # safe | candidate | to_try | avoiding
     note: Mapped[str | None] = mapped_column(Text)
     source_challenge_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("challenges.id"))
+    snoozed_until: Mapped[date | None] = mapped_column(Date)   # 홈 "나중에"
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

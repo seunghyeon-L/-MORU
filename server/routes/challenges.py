@@ -14,6 +14,7 @@ from models import Challenge, ChallengeAttempt
 from schemas import AttemptIn, ChallengeIn
 from services import challenges as svc
 from services import users
+from services.text import w
 
 router = APIRouter(tags=["도전"], prefix="/challenges")
 
@@ -71,7 +72,7 @@ async def suggestion(response: Response, dev: str = Depends(device_id),
         "reason": {
             "title": "왜 제안하냐면",
             # TODO(A-4): 실제 관찰로 문장을 만든다. 지금은 기록이 없을 때의 문장.
-            "body": f"{name}을(를) 피하고 계신다고 하셨어요. "
+            "body": f"{w(name, '을')} 피하고 계신다고 하셨어요. "
                     f"정말 그런지는 아직 확인해보지 않았고요.",
         },
         "steps": [{**s, "title": s["title"].format(name=name)} for s in STEPS],
@@ -146,7 +147,7 @@ async def detail(challenge_id: int, dev: str = Depends(device_id),
         "instruction": (
             f"{ch.testing_start.strftime('%m월 %d일')}까지 {name}만 빼두세요"
             if still_eliminating
-            else f"이번 주 아무 날 하루, {name}을(를) 평소만큼 드셔보세요"),
+            else f"이번 주 아무 날 하루, {w(name)} 평소만큼 드셔보세요"),
         "note": ("다른 음식은 평소대로 드셔도 돼요."
                  if still_eliminating
                  else "연속으로 하지 않아도 돼요. 편한 날 하루면 됩니다."),

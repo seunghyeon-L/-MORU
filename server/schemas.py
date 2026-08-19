@@ -104,3 +104,7 @@ class ChatIn(BaseModel):
 class SaveIn(BaseModel):
     kind: Literal["recipe", "substitution", "menu"]
     ref_id: int
+
+
+class SnoozeIn(BaseModel):
+    ingredient_id: int
