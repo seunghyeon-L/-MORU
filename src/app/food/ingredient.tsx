@@ -18,7 +18,7 @@ import type { Alternative } from '@/types/food';
 /**
  * D3 음식 확인 · 참고 정보와 대체안.
  * 최근 기록 기반 관찰(원인 단정 없음) + 지금 바로 시도해볼 수 있는 대안을 보여준다.
- * D4(기록 완료) 화면은 아직 없어 CTA는 임시로 홈으로 돌아간다.
+ * 하단 CTA는 D4(기록 완료) 화면으로 이어진다.
  */
 export default function FoodIngredientScreen() {
   const router = useRouter();
@@ -36,7 +36,7 @@ export default function FoodIngredientScreen() {
   const topPattern = analysis?.hasEnoughData ? analysis.ingredientPatterns[0] : undefined;
   const sleepFactor = topPattern?.coOccurringFactors.find((f) => f.factor === 'poor-sleep');
 
-  const finish = () => router.replace('/(tabs)');
+  const finish = () => router.push('/food/complete');
 
   return (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
