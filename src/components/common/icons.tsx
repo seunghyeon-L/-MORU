@@ -226,6 +226,40 @@ export function PencilIcon({ size, color }: IconProps) {
   );
 }
 
+/** F1 재도입 제안 상단 · F3 안심 안내 — 새싹(잎 두 장 + 흙) */
+export function SproutIcon({ size, color }: IconProps) {
+  const s = size / 24;
+  const leafStyle = (left: number, rotate: string) => ({
+    position: 'absolute' as const,
+    left: left * s,
+    top: 4 * s,
+    width: 9 * s,
+    height: 15 * s,
+    borderRadius: 7 * s,
+    borderWidth: STROKE,
+    borderColor: color,
+    transform: [{ rotate }],
+  });
+  return (
+    <View style={{ width: size, height: size }}>
+      <View style={leafStyle(5.5, '-16deg')} />
+      <View style={leafStyle(9.5, '16deg')} />
+      <View
+        style={{
+          position: 'absolute',
+          left: 4 * s,
+          top: 18 * s,
+          width: 16 * s,
+          height: 3 * s,
+          borderRadius: 1.5 * s,
+          borderWidth: STROKE,
+          borderColor: color,
+        }}
+      />
+    </View>
+  );
+}
+
 /** D1 "원재료표 촬영" — 문서/라벨 */
 export function DocumentIcon({ size, color }: IconProps) {
   const s = size / 24;
