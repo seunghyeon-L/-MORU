@@ -260,6 +260,28 @@ export function SproutIcon({ size, color }: IconProps) {
   );
 }
 
+/** G 나의 식탁 상단 우측 — 세로 점 3개 메뉴 */
+export function MoreVerticalIcon({ size, color }: IconProps) {
+  const s = size / 24;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      {[6, 12, 18].map((top) => (
+        <View
+          key={top}
+          style={{
+            position: 'absolute',
+            top: top * s,
+            width: 3.2 * s,
+            height: 3.2 * s,
+            borderRadius: 1.6 * s,
+            backgroundColor: color,
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
 /** D1 "원재료표 촬영" — 문서/라벨 */
 export function DocumentIcon({ size, color }: IconProps) {
   const s = size / 24;
@@ -291,6 +313,116 @@ export function DocumentIcon({ size, color }: IconProps) {
           }}
         />
       ))}
+    </View>
+  );
+}
+
+/** H1 "성분 조절 제안" — 순환/조절을 나타내는 refresh 원형 화살표 */
+export function RefreshIcon({ size, color }: IconProps) {
+  const s = size / 24;
+  return (
+    <View style={{ width: size, height: size }}>
+      <View
+        style={{
+          position: 'absolute',
+          left: 4 * s,
+          top: 4 * s,
+          width: 16 * s,
+          height: 16 * s,
+          borderRadius: 8 * s,
+          borderWidth: STROKE,
+          borderTopColor: color,
+          borderRightColor: color,
+          borderBottomColor: color,
+          borderLeftColor: 'transparent',
+          transform: [{ rotate: '-25deg' }],
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          left: 14.5 * s,
+          top: 2.5 * s,
+          width: 0,
+          height: 0,
+          borderStyle: 'solid',
+          borderLeftWidth: 3 * s,
+          borderRightWidth: 3 * s,
+          borderBottomWidth: 4.5 * s,
+          borderLeftColor: 'transparent',
+          borderRightColor: 'transparent',
+          borderBottomColor: color,
+          transform: [{ rotate: '112deg' }],
+        }}
+      />
+    </View>
+  );
+}
+
+/** H1 "나에게 맞는 선택" — 네잎클로버 */
+export function CloverIcon({ size, color }: IconProps) {
+  const s = size / 24;
+  const petal = (left: number, top: number) => ({
+    position: 'absolute' as const,
+    left: left * s,
+    top: top * s,
+    width: 9 * s,
+    height: 9 * s,
+    borderRadius: 4.5 * s,
+    backgroundColor: color,
+  });
+  return (
+    <View style={{ width: size, height: size }}>
+      <View style={petal(7.5, 3)} />
+      <View style={petal(7.5, 11)} />
+      <View style={petal(3.5, 7)} />
+      <View style={petal(11.5, 7)} />
+      <View
+        style={{
+          position: 'absolute',
+          left: 11 * s,
+          top: 16 * s,
+          width: STROKE,
+          height: 6 * s,
+          borderRadius: 1,
+          backgroundColor: color,
+          transform: [{ rotate: '20deg' }],
+        }}
+      />
+    </View>
+  );
+}
+
+/** 채팅 입력창 전송 버튼 — 위쪽 화살표 */
+export function SendArrowIcon({ size, color }: IconProps) {
+  const s = size / 24;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center' }}>
+      <View
+        style={{
+          position: 'absolute',
+          top: 4 * s,
+          width: 0,
+          height: 0,
+          borderStyle: 'solid',
+          borderLeftWidth: 4.5 * s,
+          borderRightWidth: 4.5 * s,
+          borderBottomWidth: 6 * s,
+          borderLeftColor: 'transparent',
+          borderRightColor: 'transparent',
+          borderBottomColor: color,
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          top: 9 * s,
+          width: STROKE + 0.4,
+          height: 11 * s,
+          borderRadius: 1,
+          backgroundColor: color,
+        }}
+      />
     </View>
   );
 }

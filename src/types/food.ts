@@ -108,8 +108,8 @@ export type ChatContext = {
 /* 나의 식탁 ((tabs)/table)                                             */
 /* ------------------------------------------------------------------ */
 
-/** 점수가 아니라 상태와 관찰 횟수로만 표현한다 */
-export type MyTableStatus = 'safe' | 'candidate';
+/** 점수가 아니라 상태와 관찰 횟수로만 표현한다. 'unconfirmed' = 아직 재도입을 시작하지 않은, 다시 먹어볼 음식 */
+export type MyTableStatus = 'safe' | 'candidate' | 'unconfirmed';
 
 export type MyTableFood = {
   id: string;

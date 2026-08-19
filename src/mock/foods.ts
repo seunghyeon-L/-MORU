@@ -160,13 +160,13 @@ export const mockChatMessages: ChatMessage[] = [
   {
     id: 'chat-1',
     role: 'user',
-    text: '녹차라떼가 먹고 싶어요.',
+    text: '녹차라떼 마시고 싶어!',
     createdAt: '2026-08-18T10:00:00.000Z',
   },
   {
     id: 'chat-2',
     role: 'assistant',
-    text: '녹차라떼에는 우유가 들어가요. 우유를 줄이거나 다른 재료로 바꿔보는 방법도 함께 살펴볼 수 있어요.',
+    text: '녹차라떼, 즐기고 싶은 마음 너무 잘 알아요 😊\n당신에게 더 편안할 수 있는 방법을 찾아볼게요.',
     createdAt: '2026-08-18T10:00:03.000Z',
   },
 ];
@@ -175,45 +175,71 @@ export const mockChatMessages: ChatMessage[] = [
 /* 나의 식탁 ((tabs)/table)                                             */
 /* ------------------------------------------------------------------ */
 
+/** 원래 피하던 음식 전체 개수 (온보딩에서 등록한 회피 목록 기준) — 확장 현황 요약(ExpansionCard)에 사용 */
+export const mockOriginallyAvoidedCount = 8;
+
 export const mockMyTableFoods: MyTableFood[] = [
   {
-    id: 'table-rice',
-    name: '흰쌀밥',
+    id: 'table-milk',
+    name: '우유',
     status: 'safe',
-    lastEatenAt: '2026-08-18T12:00:00.000Z',
-    comfortableCount: 12,
-    totalCount: 12,
-  },
-  {
-    id: 'table-banana',
-    name: '바나나',
-    status: 'safe',
-    lastEatenAt: '2026-08-16T08:30:00.000Z',
-    comfortableCount: 7,
-    totalCount: 8,
-  },
-  {
-    id: 'table-cabbage',
-    name: '양배추찜',
-    status: 'safe',
-    lastEatenAt: '2026-08-14T19:00:00.000Z',
     comfortableCount: 5,
     totalCount: 5,
   },
   {
-    id: 'table-yogurt',
-    name: '요거트',
-    status: 'candidate',
-    lastEatenAt: '2026-05-02T09:00:00.000Z',
-    comfortableCount: 1,
-    totalCount: 2,
+    id: 'table-wheat-bread',
+    name: '밀빵',
+    status: 'safe',
+    comfortableCount: 4,
+    totalCount: 4,
   },
   {
-    id: 'table-bread',
-    name: '식빵',
-    status: 'candidate',
-    lastEatenAt: '2026-04-20T08:00:00.000Z',
-    comfortableCount: 2,
+    id: 'table-legumes',
+    name: '콩류',
+    status: 'safe',
+    comfortableCount: 3,
     totalCount: 3,
+  },
+  {
+    id: 'table-coffee',
+    name: '커피',
+    status: 'safe',
+    comfortableCount: 6,
+    totalCount: 6,
+  },
+  {
+    id: 'table-soda',
+    name: '탄산음료',
+    status: 'safe',
+    comfortableCount: 3,
+    totalCount: 4,
+  },
+  {
+    id: 'table-apple',
+    name: '사과',
+    status: 'safe',
+    comfortableCount: 4,
+    totalCount: 4,
+  },
+  {
+    id: 'table-onion',
+    name: '양파',
+    status: 'candidate',
+    comfortableCount: 1,
+    totalCount: 3,
+  },
+  {
+    id: 'table-garlic',
+    name: '마늘',
+    status: 'unconfirmed',
+    comfortableCount: 0,
+    totalCount: 0,
+  },
+  {
+    id: 'table-spicy',
+    name: '매운 음식',
+    status: 'unconfirmed',
+    comfortableCount: 0,
+    totalCount: 0,
   },
 ];
