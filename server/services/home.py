@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from models import BusyDay, Challenge, MyTableItem, User
 from services import challenges as ch_svc
+from services import patterns
 from services.text import w
 
 # Foulkes/Lomer 2025 — 재도입 1,361건 중 965건 통과
@@ -41,8 +42,8 @@ def build(db: Session, user: User) -> dict:
         if c := _suggestion_card(db, user):
             cards.append(c)
 
-    # TODO(A-4): 이번 주 정리. 식사 기록이 붙어야(B-3) 만들 수 있다.
-    #            "과당이 조금 높았어요" 같은 문장은 6축 계산(A-3) 결과다.
+    if c := patterns.weekly_recap(db, user):
+        cards.append(c)
 
     if c := _schedule_card(db, user, has_open=bool(open_ch)):
         cards.append(c)

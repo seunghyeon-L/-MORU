@@ -8,7 +8,7 @@ import base64
 from datetime import datetime, timezone
 from io import BytesIO
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from PIL import Image
 from sqlalchemy.orm import Session
 
@@ -20,7 +20,7 @@ from models import (
 )
 from schemas import IdentifyIn, MealIn, ResolveIn, SymptomIn
 from services import ingredients as ingredients_svc
-from services import fodmap, llm, safety, symptoms, users
+from services import fodmap, llm, patterns, safety, symptoms, users
 
 router = APIRouter(tags=["기록"])
 
@@ -211,32 +211,19 @@ async def create_meal(body: MealIn, dev: str = Depends(device_id), db: Session =
         ],
     }),
 )
-async def meal_insight(meal_id: int, dev: str = Depends(device_id)):
+async def meal_insight(meal_id: int, dev: str = Depends(device_id),
+                       db: Session = Depends(get_db)):
     """caveat 은 절대 생략하지 않는다.
 
     관찰만 보여주고 교란 요인을 같이 안 보여주면 그게 판정이 된다 (절대 원칙 ①).
-    caveat 이 null 인 경우가 있고, 그때만 프론트가 안 그린다.
+    말할 만한 근거가 없으면 observation 이 null 로 오고, 그때는 카드를 안 그린다.
     """
-    # TODO(A-4)
-    return await _insight_stub()
-
-
-async def _insight_stub():
-    return {
-        "food_name": "김치찌개",
-        "note": "국물에 양파즙이 들어있을 수 있어요",
-        "observation": {
-            "title": "최근 기록을 보면",
-            "body": "양파가 들어간 식사 4번 중 3번, 몇 시간 뒤 불편함이 기록됐어요.",
-            "caveat": "다만 그중 2번은 수면이 5시간 이하였어요. 음식 때문이라고 단정하기는 일러요.",
-        },
-        "suggestions": [
-            {"rank": 1, "title": "소량부터 시도해보기", "detail": "평소보다 조금만"},
-            {"rank": 2, "title": "반 그릇만 드시기", "detail": "국물은 조금, 건더기 위주로"},
-            {"rank": 3, "title": "마늘 빼달라고 요청하기", "detail": "식당에서도 대부분 가능해요"},
-            {"rank": 4, "title": "다른 메뉴 골라보기", "detail": "맑은 국 · 된장찌개"},
-        ],
-    }
+    u = users.get_or_create(db, dev)
+    meal = db.get(Meal, meal_id)
+    if meal is None or meal.user_id != u.id:
+        raise HTTPException(404, {"code": "MEAL_NOT_FOUND",
+                                  "message": "기록을 찾지 못했어요."})
+    return patterns.meal_insight(db, u, meal)
 
 
 # ── 증상 ──────────────────────────────────────

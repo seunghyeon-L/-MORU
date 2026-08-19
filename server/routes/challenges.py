@@ -13,7 +13,7 @@ from deps import device_id, ex
 from models import Challenge, ChallengeAttempt
 from schemas import AttemptIn, ChallengeIn
 from services import challenges as svc
-from services import users
+from services import patterns, users
 from services.text import w
 
 router = APIRouter(tags=["도전"], prefix="/challenges")
@@ -71,9 +71,7 @@ async def suggestion(response: Response, dev: str = Depends(device_id),
         "title": f"{name}, 다시 시도해볼까요?",
         "reason": {
             "title": "왜 제안하냐면",
-            # TODO(A-4): 실제 관찰로 문장을 만든다. 지금은 기록이 없을 때의 문장.
-            "body": f"{w(name, '을')} 피하고 계신다고 하셨어요. "
-                    f"정말 그런지는 아직 확인해보지 않았고요.",
+            "body": patterns.suggestion_reason(db, u, item.ingredient_id, name),
         },
         "steps": [{**s, "title": s["title"].format(name=name)} for s in STEPS],
         "evidence": EVIDENCE,

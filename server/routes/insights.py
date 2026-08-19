@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from db_session import get_db
 from deps import device_id, ex
 from schemas import SnoozeIn
-from services import home, mytable, users
+from services import home, mytable, patterns, users
 
 router = APIRouter(tags=["홈·분석"])
 
@@ -86,30 +86,14 @@ async def snooze(body: SnoozeIn, dev: str = Depends(device_id),
         },
     }),
 )
-async def patterns(dev: str = Depends(device_id)):
+async def patterns_view(dev: str = Depends(device_id), db: Session = Depends(get_db)):
     """verdict.title 은 항상 유보형이다.
 
     "양파가 원인입니다" 같은 문장은 서버가 절대 만들지 않는다 (절대 원칙 ①).
-    기록이 적으면 summary 가 null, timeline 이 빈 배열로 온다.
+    근거가 얇으면 summary 가 null 로 온다 — 관찰을 꺼내는 것 자체가 판정이기 때문이다.
     """
-    # TODO(A-4): 감쇠 곡선으로 노출-증상 정렬 + 교란 요인 집계
-    return {
-        "headline": "지금까지 기록을 모아봤어요",
-        "summary": "양파가 들어간 식사 4번 중 3번, 몇 시간 뒤 불편함이 있었어요.",
-        "timeline": [
-            {"time": "12:30", "meal": "점심", "food": "김치찌개", "ago": "8시간 전", "phase": "발효 시점"},
-            {"time": "19:40", "meal": "저녁", "food": "떡볶이", "ago": "1시간 전", "phase": "아직 도착 전"},
-        ],
-        "cofactors": [
-            {"label": "수면 5시간 이하", "count": 2},
-            {"label": "스트레스 높음", "count": 1},
-        ],
-        "verdict": {
-            "title": "음식 때문인지는 아직 알 수 없어요",
-            "body": "수면이 겹친 날이 많아서, 지금 단정하기는 일러요. 정확히 알아보고 싶으시면 도와드릴게요.",
-            "action": {"label": "확인해보기", "screen": "F1", "ingredient_id": 12},
-        },
-    }
+    u = users.get_or_create(db, dev)
+    return patterns.view(db, u)
 
 
 @router.get(

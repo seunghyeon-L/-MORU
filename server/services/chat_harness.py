@@ -22,11 +22,14 @@
 """
 
 import re
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
-from models import Challenge, MyTableItem, User
-from services import challenges, llm
+from models import Challenge, Meal, MyTableItem, User
+from services import challenges, llm, patterns
+
+KST = timezone(timedelta(hours=9))
 
 MAX_RETRY = 2
 

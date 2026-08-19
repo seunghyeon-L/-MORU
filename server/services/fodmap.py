@@ -45,31 +45,32 @@ DEFAULT_GRAMS = 50
 #  1. 식사 1건 → 6축
 # ══════════════════════════════════════════════
 
-def compute_meal(db: Session, meal: Meal) -> dict[str, float]:
-    """식사 1건의 6축 섭취 추정량을 계산해 meal_fodmap 에 넣는다.
+def meal_breakdown(db: Session, meal: Meal) -> tuple[dict[int, dict[str, float]], float]:
+    """식사 1건을 **재료별로** 쪼갠 6축 기여량.
 
-    D2 에서 사용자가 최종 확정한 재료만 쓴다. AI 가 뽑은 원본이 아니라.
+    합계만 있으면 "이 식사에 프럭탄 3g" 까지는 알아도
+    그게 마늘에서 왔는지 김치에서 왔는지를 모른다.
+    패턴 분석이 재료를 지목하려면 이 내역이 있어야 한다.
+
+    반환: ({재료id: {축: g}}, 추정으로 때운 비율)
     """
     rows = (db.query(MealIngredient, Ingredient)
             .join(Ingredient, Ingredient.id == MealIngredient.ingredient_id)
             .filter(MealIngredient.meal_id == meal.id).all())
     if not rows:
-        _clear(db, meal)
-        return {}
+        return {}, 0.0
 
-    # 마스터 음식이면 재료별 그램과 국물 여부를 안다.
     recipe: dict[int, FoodIngredient] = {}
     if meal.food_id:
         recipe = {fi.ingredient_id: fi for fi in db.query(FoodIngredient)
                   .filter(FoodIngredient.food_id == meal.food_id)}
 
     scale = PORTION.get(meal.portion, 1.0)
-    totals = {a: 0.0 for a in AXES}
+    per: dict[int, dict[str, float]] = {}
     guessed_g, total_g = 0.0, 0.0
 
-    for mi, ing in rows:
+    for _, ing in rows:
         fi = recipe.get(ing.id)
-
         if fi is not None and fi.grams is not None:
             grams = float(fi.grams)
             in_broth = fi.in_broth
@@ -86,11 +87,25 @@ def compute_meal(db: Session, meal: Meal) -> dict[str, float]:
 
         for f in db.query(IngredientFodmap).filter(
                 IngredientFodmap.ingredient_id == ing.id):
-            totals[f.axis] += grams * float(f.grams_per_100g) / 100.0
+            g = grams * float(f.grams_per_100g) / 100.0
+            if g > 0:
+                per.setdefault(ing.id, {})[f.axis] = round(g, 4)
 
-    ratio = round(guessed_g / total_g, 3) if total_g else 0.0
+    return per, (round(guessed_g / total_g, 3) if total_g else 0.0)
+
+
+def compute_meal(db: Session, meal: Meal) -> dict[str, float]:
+    """식사 1건의 6축 섭취 추정량을 계산해 meal_fodmap 에 넣는다.
+
+    D2 에서 사용자가 최종 확정한 재료만 쓴다. AI 가 뽑은 원본이 아니라.
+    """
+    per, ratio = meal_breakdown(db, meal)
+    totals = {a: 0.0 for a in AXES}
+    for axes in per.values():
+        for axis, g in axes.items():
+            totals[axis] += g
     _save(db, meal, totals, ratio)
-    return totals
+    return {a: v for a, v in totals.items() if v > 0}
 
 
 def _clear(db: Session, meal: Meal) -> None:
