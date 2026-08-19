@@ -1,0 +1,924 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MORU 하네스</title>
+<!--
+  백엔드 계약 검증용 하네스. 프론트의 진짜 화면이 아니다.
+  왼쪽 = 화면 흐름, 오른쪽 = 방금 나간 요청과 실제 응답.
+  빌드 없이 이 파일만 브라우저로 열면 된다.
+-->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --sage:#7E9F6E; --sage-d:#6A8A5C; --sage-l:#E8EFE3;
+    --cream:#F8F3EA; --ink:#3A342C; --mute:#8B8377; --line:#E4DDD1; --card:#fff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Noto Sans KR',sans-serif;background:#2A2622;color:var(--ink);
+       display:flex;height:100vh;overflow:hidden}
+
+  /* ── 왼쪽: 화면 ── */
+  #stage{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;
+         justify-content:center;padding:20px;gap:12px}
+  .phone{width:393px;height:812px;background:var(--cream);border-radius:34px;
+         overflow:hidden;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.5);
+         display:flex;flex-direction:column}
+  .scroll{flex:1;overflow-y:auto;padding:20px 24px 90px}
+  .scroll::-webkit-scrollbar{width:0}
+
+  /* ── 오른쪽: 검증 패널 ── */
+  #panel{flex:1;min-width:0;background:#1E1B18;color:#D8D2C8;display:flex;flex-direction:column}
+  #panel h2{font-size:12px;letter-spacing:.08em;color:#8B8377;padding:14px 18px 10px;
+            text-transform:uppercase;border-bottom:1px solid #332F2A}
+  #flow{padding:12px 18px;border-bottom:1px solid #332F2A;display:flex;flex-wrap:wrap;gap:5px}
+  #flow button{font:500 11px 'Noto Sans KR';background:#332F2A;color:#B5AE A2;color:#B5AEA2;
+               border:0;border-radius:6px;padding:5px 9px;cursor:pointer}
+  #flow button:hover{background:#45403A;color:#fff}
+  #flow button.on{background:var(--sage);color:#fff}
+  #log{flex:1;overflow-y:auto;padding:14px 18px;font:12px/1.6 ui-monospace,Menlo,Consolas,monospace}
+  .req{margin-bottom:14px;border-left:2px solid #45403A;padding-left:12px}
+  .req.err{border-color:#C4705E}
+  .req .l1{color:#fff;font-weight:700;margin-bottom:4px}
+  .req .code{color:var(--sage)}
+  .req.err .code{color:#E08A76}
+  .req pre{white-space:pre-wrap;word-break:break-all;color:#9C958A;max-height:260px;overflow:auto}
+
+  /* ── 공통 UI ── */
+  .nav{display:flex;align-items:center;gap:10px;padding:14px 24px 6px;font-weight:700;font-size:15px}
+  .nav .back{cursor:pointer;color:var(--mute);font-size:18px;line-height:1}
+  .step{font-size:12px;color:var(--mute);margin-bottom:10px;font-weight:500}
+  h1.q{font-size:21px;line-height:1.45;font-weight:700;margin-bottom:8px}
+  p.sub{font-size:13.5px;line-height:1.65;color:var(--mute);margin-bottom:20px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
+        padding:18px;margin-bottom:12px}
+  .card h3{font-size:15px;font-weight:700;margin-bottom:6px}
+  .card p{font-size:13.5px;line-height:1.7;color:var(--mute)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:999px;
+        padding:9px 15px;font:500 13.5px 'Noto Sans KR';cursor:pointer;color:var(--ink)}
+  .chip.on{background:var(--sage-l);border-color:var(--sage);color:var(--sage-d);font-weight:700}
+  .btn{width:100%;background:var(--sage);color:#fff;border:0;border-radius:14px;
+       padding:16px;font:700 15px 'Noto Sans KR';cursor:pointer}
+  .btn:disabled{background:#CFCABF;cursor:not-allowed}
+  .btn.ghost{background:transparent;color:var(--mute);font-weight:500}
+  .foot{position:absolute;left:0;right:0;bottom:0;padding:14px 24px 22px;
+        background:linear-gradient(transparent,var(--cream) 22%)}
+  .tabs{display:flex;border-top:1px solid var(--line);background:#fff}
+  .tabs div{flex:1;text-align:center;padding:12px 0 20px;font:500 12px 'Noto Sans KR';
+            color:var(--mute);cursor:pointer}
+  .tabs div.on{color:var(--sage-d);font-weight:700}
+  .row{display:flex;gap:10px}
+  .row .chip{flex:1;text-align:center}
+  .note{background:var(--sage-l);border-radius:12px;padding:14px;font-size:12.5px;
+        line-height:1.7;color:var(--sage-d);margin-bottom:12px}
+  .caveat{border-left:3px solid var(--line);padding-left:12px;margin-top:10px;
+          font-size:12.5px;line-height:1.7;color:var(--mute)}
+  .step-item{display:flex;gap:12px;margin-bottom:14px}
+  .step-item .n{flex:0 0 22px;height:22px;border-radius:50%;background:var(--sage-l);
+                color:var(--sage-d);font:700 12px 'Noto Sans KR';display:flex;
+                align-items:center;justify-content:center}
+  .step-item .t{font-size:14px;font-weight:500;margin-bottom:2px}
+  .step-item .d{font-size:12.5px;color:var(--mute)}
+  .empty{text-align:center;padding:60px 20px;color:var(--mute);font-size:13.5px;line-height:1.8}
+  .warn{background:#FBEDE8;border:1px solid #E8C7BB;color:#A65640;border-radius:12px;
+        padding:14px;font-size:13px;line-height:1.7;margin-bottom:12px}
+  .bubble{max-width:78%;padding:12px 15px;border-radius:16px;font-size:13.5px;
+          line-height:1.65;margin-bottom:10px}
+  .bubble.me{background:var(--sage);color:#fff;margin-left:auto;border-bottom-right-radius:4px}
+  .bubble.ai{background:#fff;border:1px solid var(--line);border-bottom-left-radius:4px}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="panel">
+  <h2>화면 흐름 — 아무 데나 눌러 이동</h2>
+  <div id="flow"></div>
+  <h2>실제 요청 · 응답</h2>
+  <div id="log"></div>
+</div>
+
+<script type="text/babel">
+const {useState,useEffect,useCallback} = React;
+
+const API = "https://1-201-117-54.sslip.io";
+
+// 기기 식별자. 앱이 최초 실행 시 만드는 UUID 와 같은 역할.
+let DEV = localStorage.getItem("moru_device");
+if(!DEV){ DEV = crypto.randomUUID(); localStorage.setItem("moru_device", DEV); }
+
+// ── 요청 로거 ───────────────────────────────────
+let logSet = null;
+async function call(method, path, body){
+  const t0 = performance.now();
+  let res, json, err=false;
+  try{
+    res = await fetch(API+path, {
+      method,
+      headers: {"X-Device-Id": DEV, ...(body?{"Content-Type":"application/json"}:{})},
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    json = res.status===204 ? null : await res.json().catch(()=>null);
+    if(!res.ok) err = true;
+  }catch(e){
+    err = true; json = {error:{message:String(e)}}; res={status:0};
+  }
+  logSet && logSet(l => [{
+    id: Math.random(), method, path, status: res.status, err,
+    ms: Math.round(performance.now()-t0), json
+  }, ...l].slice(0,40));
+  return json;
+}
+
+// ── 화면 목록 ───────────────────────────────────
+const FLOW = [
+  ["A1","서비스 소개"],["B1","안전 확인"],["B1x","병원 안내"],["B2","알레르기"],
+  ["B3","피하는 음식"],["B4","증상 문진"],["B6","온보딩 완료"],
+  ["C","홈"],["C0","홈 · 빈 상태"],
+  ["D1","입력 방식"],["D2","재료 확인"],["D3","참고 정보"],["D4","기록 완료"],
+  ["E1","증상 기록"],["E2","상황 확인"],["E3","패턴 분석"],
+  ["F1","도전 제안"],["F2","제한 설정"],["F3","표적 도전"],["F4","도전 결과"],
+  ["G","나의 식탁"],
+  ["H1","AI 대화"],["H4","음식 대체안"],["H3","성분 대체"],["H5","메뉴 대체"],["H2","레시피"],
+];
+
+// ── 조각 ────────────────────────────────────────
+const Nav = ({t,onBack}) => (
+  <div className="nav">{onBack && <span className="back" onClick={onBack}>‹</span>}<span>{t}</span></div>
+);
+const Foot = ({label,onClick,ghost,disabled}) => (
+  <div className="foot">
+    <button className="btn" onClick={onClick} disabled={disabled}>{label}</button>
+    {ghost && <button className="btn ghost" onClick={ghost.onClick}>{ghost.label}</button>}
+  </div>
+);
+function Chips({items,sel,setSel,multi=true}){
+  const tog = v => setSel(multi ? (sel.includes(v)?sel.filter(x=>x!==v):[...sel,v]) : [v]);
+  return <div className="chips">{items.map(v =>
+    <button key={v} className={"chip"+(sel.includes(v)?" on":"")} onClick={()=>tog(v)}>{v}</button>)}</div>;
+}
+const Loading = () => <div className="empty">불러오는 중…</div>;
+
+// 서버에서 받아서 그리는 화면들의 공통 훅
+function useApi(fn, deps=[]){
+  const [d,setD] = useState(undefined);
+  useEffect(()=>{ let live=true; fn().then(r=>live&&setD(r===null?null:r)); return ()=>{live=false}; }, deps);
+  return d;
+}
+
+// ══════════════════════════════════════════════
+//  화면들
+// ══════════════════════════════════════════════
+function Screen({id,go}){
+  switch(id){
+
+  case "A1": return <>
+    <div className="scroll" style={{textAlign:"center",paddingTop:120}}>
+      <div style={{width:150,height:150,margin:"0 auto 24px",borderRadius:"50%",background:"var(--sage-l)",
+                   display:"flex",alignItems:"center",justifyContent:"center",fontSize:52}}>🌿</div>
+      <div style={{fontSize:22,fontWeight:700,letterSpacing:".06em",marginBottom:26}}>MORU</div>
+      <h1 className="q" style={{fontSize:19}}>두려움 때문에 좁아진 식탁,<br/>안심하고 다시 넓혀드릴게요</h1>
+    </div>
+    <Foot label="시작하기" onClick={()=>go("B1")}/>
+  </>;
+
+  case "B1": return <B1 go={go}/>;
+
+  case "B1x": return <>
+    <Nav t="안전 안내" onBack={()=>go("B1")}/>
+    <div className="scroll">
+      <div className="warn" style={{marginTop:20}}>
+        <b style={{display:"block",marginBottom:6,fontSize:14}}>먼저 병원에 가보시는 게 좋겠어요</b>
+        혈변은 앱으로 확인할 수 있는 범위를 넘어서요. 소화기내과 진료를 권해드려요.
+      </div>
+      <p className="sub">MORU는 질병을 진단하거나 치료하는 서비스가 아니에요.</p>
+    </div>
+  </>;
+
+  case "B2": return <B2 go={go}/>;
+  case "B3": return <B3 go={go}/>;
+  case "B4": return <B4 go={go}/>;
+
+  case "B6": return <>
+    <div className="scroll" style={{textAlign:"center",paddingTop:150}}>
+      <div style={{fontSize:52,marginBottom:20}}>🌱</div>
+      <h1 className="q">준비됐어요</h1>
+      <p className="sub">천천히, 하나씩 넓혀가요.</p>
+    </div>
+    <Foot label="시작하기" onClick={()=>go("C")}/>
+  </>;
+
+  case "C":  return <Home go={go}/>;
+  case "C0": return <Home go={go} empty/>;
+  case "D1": return <D1 go={go}/>;
+  case "D2": return <D2 go={go}/>;
+  case "D3": return <D3 go={go}/>;
+
+  case "D4": return <>
+    <div className="scroll" style={{textAlign:"center",paddingTop:170}}>
+      <div style={{fontSize:48,marginBottom:18}}>✓</div>
+      <h1 className="q">기록했어요</h1>
+      <p className="sub">몇 시간 뒤에 어떠셨는지 여쭤볼게요.</p>
+    </div>
+    <Foot label="홈으로" onClick={()=>go("C")}/>
+  </>;
+
+  case "E1": return <E1 go={go}/>;
+  case "E2": return <E2 go={go}/>;
+  case "E3": return <E3 go={go}/>;
+  case "F1": return <F1 go={go}/>;
+  case "F2": return <F2 go={go}/>;
+  case "F3": return <F3 go={go}/>;
+  case "F4": return <F4 go={go}/>;
+  case "G":  return <G  go={go}/>;
+  case "H1": return <H1 go={go}/>;
+  case "H4": return <H4 go={go}/>;
+  case "H3": return <H3 go={go}/>;
+  case "H5": return <H5 go={go}/>;
+  case "H2": return <H2 go={go}/>;
+  default:   return <div className="empty">{id}</div>;
+  }
+}
+
+// ── B1 안전 확인 ────────────────────────────────
+const FLAGS = [
+  ["blood_in_stool","변에 피가 섞여 나온 적이 있어요"],
+  ["weight_loss","의도치 않게 체중이 줄었어요"],
+  ["anemia","빈혈 진단을 받은 적이 있어요"],
+  ["night_symptoms","자다가 증상 때문에 깨요"],
+  ["family_history","가족 중 장 질환 진단을 받은 분이 있어요"],
+  ["age_over_50","50세 이상이에요"],
+];
+function B1({go}){
+  const [sel,setSel] = useState([]);
+  const submit = async () => {
+    const body = Object.fromEntries(FLAGS.map(([k])=>[k, sel.includes(k)]));
+    const r = await call("POST","/onboarding/safety",body);
+    go(r && r.blocked ? "B1x" : "B2");
+  };
+  return <>
+    <div className="scroll">
+      <div className="step">1 / 4</div>
+      <h1 className="q">해당되는 것이 있나요?</h1>
+      <p className="sub">아래 중 하나라도 있으면 앱보다 병원이 먼저예요.</p>
+      <div className="chips" style={{flexDirection:"column"}}>
+        {FLAGS.map(([k,label]) =>
+          <button key={k} className={"chip"+(sel.includes(k)?" on":"")}
+            style={{width:"100%",textAlign:"left",borderRadius:12}}
+            onClick={()=>setSel(sel.includes(k)?sel.filter(x=>x!==k):[...sel,k])}>{label}</button>)}
+      </div>
+    </div>
+    <Foot label={sel.length?"다음":"해당 없어요"} onClick={submit}/>
+  </>;
+}
+
+// ── B2 알레르기 ────────────────────────────────
+function B2({go}){
+  const [a,setA] = useState([]); const [c,setC] = useState([]);
+  return <>
+    <div className="scroll">
+      <div className="step">2 / 4</div>
+      <h1 className="q">알레르기가 있는 음식이 있나요?</h1>
+      <p className="sub">알레르기는 양과 상관없이 위험해서, MORU가 아예 추천하지 않아요.</p>
+      <Chips items={["없어요","우유","계란","땅콩","견과류","밀","갑각류","기타"]} sel={a} setSel={setA}/>
+      <h1 className="q" style={{fontSize:17}}>셀리악병 진단을 받으신 적 있나요?</h1>
+      <p className="sub">진단받으셨다면 밀은 양과 무관하게 제외돼요.</p>
+      <Chips items={["아니요","네","모르겠어요"]} sel={c} setSel={setC} multi={false}/>
+    </div>
+    <Foot label="다음" onClick={()=>{ window._on={allergies:a.filter(x=>x!=="없어요"),
+      celiac:c[0]==="네"?"yes":c[0]==="모르겠어요"?"unknown":"no"}; go("B3"); }}/>
+  </>;
+}
+
+// ── B3 피하는 음식 ──────────────────────────────
+function B3({go}){
+  const [s,setS] = useState([]);
+  return <>
+    <div className="scroll">
+      <div className="step">3 / 4</div>
+      <h1 className="q">요즘 피하고 계신 음식이 있나요?</h1>
+      <p className="sub">지금 떠오르는 것만 골라주세요. 나중에 바꿀 수 있어요.</p>
+      <Chips items={["우유·유제품","밀·빵","양파","마늘","콩류","매운 음식","커피","술",
+        "탄산음료","빵·과자","시리얼","사과·배","수박","꿀·시럽","아이스크림","버섯","아보카도","기타"]}
+        sel={s} setSel={setS}/>
+    </div>
+    <Foot label="다음" onClick={()=>{ window._on={...window._on,avoided_foods:s}; go("B4"); }}/>
+  </>;
+}
+
+// ── B4 증상 문진 ────────────────────────────────
+const FREQ = {"가끔 · 한 달에 1~2번":"monthly_1_2","일주일에 몇 번":"weekly_few",
+              "주 1~2회":"weekly_1_2","거의 매일":"almost_daily","주 3회 이상":"weekly_3plus"};
+function B4({go}){
+  const [s,setS] = useState([]); const [f,setF] = useState([]);
+  const submit = async () => {
+    await call("POST","/onboarding/profile",{
+      nickname:"은솔", ...(window._on||{}),
+      baseline_symptoms:s, baseline_frequency: FREQ[f[0]] || "weekly_few",
+    });
+    go("B6");
+  };
+  return <>
+    <div className="scroll">
+      <div className="step">4 / 4</div>
+      <h1 className="q">평소 어떤 증상을 겪으시나요?</h1>
+      <p className="sub">지금 상태를 기억해뒀다가, 나중에 얼마나 나아졌는지 보여드릴게요.</p>
+      <Chips items={["복통","복부팽만","가스","설사","변비","배변 급박감","복부 경련"]} sel={s} setSel={setS}/>
+      <h1 className="q" style={{fontSize:17}}>얼마나 자주 겪으세요?</h1>
+      <div style={{height:12}}/>
+      <Chips items={Object.keys(FREQ)} sel={f} setSel={setF} multi={false}/>
+    </div>
+    <Foot label="완료" onClick={submit} disabled={!f.length}/>
+  </>;
+}
+
+// ── C 홈 ───────────────────────────────────────
+function Home({go,empty}){
+  const d = useApi(()=>call("GET","/home"),[]);
+  if(d===undefined) return <Loading/>;
+  const cards = empty ? [] : (d?.cards||[]);
+  return <>
+    <div className="nav" style={{justifyContent:"space-between"}}>
+      <span style={{letterSpacing:".06em"}}>MORU</span>
+      <span style={{fontSize:20,cursor:"pointer"}} onClick={()=>go("H1")}>💬</span>
+    </div>
+    <div className="scroll">
+      <h1 className="q" style={{marginBottom:20}}>{d?.greeting}</h1>
+      {cards.length===0 &&
+        <div className="empty">아직 보여드릴 게 없어요.<br/>식사를 한 번 기록해볼까요?</div>}
+      {cards.map((c,i)=>
+        <div className="card" key={i}>
+          <h3>{c.title}</h3>
+          <p>{c.body}</p>
+          {c.action &&
+            <div className="row" style={{marginTop:14}}>
+              <button className="chip on" onClick={()=>go(c.action.screen)}>{c.action.label}</button>
+              {c.dismiss && <button className="chip">{c.dismiss.label}</button>}
+            </div>}
+        </div>)}
+      <button className="btn" style={{marginTop:8}} onClick={()=>go("D1")}>식사 기록하기</button>
+      <button className="btn" style={{marginTop:10,background:"#fff",color:"var(--sage-d)",
+        border:"1px solid var(--line)"}} onClick={()=>go("E1")}>증상 기록하기</button>
+    </div>
+    <div className="tabs">
+      <div className="on">홈</div>
+      <div onClick={()=>go("G")}>나의 식탁</div>
+    </div>
+  </>;
+}
+
+// ── D1 입력 방식 ────────────────────────────────
+function D1({go}){
+  const pick = async (method) => {
+    await call("POST","/meals/identify",{text:"김치찌개"});
+    window._meal = {method}; go("D2");
+  };
+  return <>
+    <Nav t="음식 기록" onBack={()=>go("C")}/>
+    <div className="scroll" style={{paddingTop:40}}>
+      <h1 className="q">어떻게 기록할까요?</h1>
+      <p className="sub">사진이 가장 빨라요.</p>
+      {[["photo","📷","사진 찍기"],["text","✏️","직접 입력"],["search","🔍","검색해서 찾기"]]
+        .map(([k,ic,label])=>
+        <button key={k} className="card" style={{width:"100%",textAlign:"left",cursor:"pointer",
+          display:"flex",gap:14,alignItems:"center"}} onClick={()=>pick(k)}>
+          <span style={{fontSize:24}}>{ic}</span><h3 style={{margin:0}}>{label}</h3>
+        </button>)}
+    </div>
+  </>;
+}
+
+// ── D2 재료 확인 ────────────────────────────────
+function D2({go}){
+  const d = useApi(()=>call("POST","/meals/identify",{text:"김치찌개"}),[]);
+  const [ing,setIng] = useState(null);
+  const [portion,setPortion] = useState("one");
+  const [broth,setBroth] = useState(true);
+  useEffect(()=>{ if(d) setIng(d.ingredients.filter(x=>x.checked).map(x=>x.id)); },[d]);
+  if(!d || ing===null) return <Loading/>;
+
+  const submit = async () => {
+    const r = await call("POST","/meals",{
+      food_id:d.food_id, food_name:d.food_name,
+      eaten_at:new Date().toISOString(), portion,
+      ate_broth: d.has_broth ? broth : null,
+      method: window._meal?.method || "text",
+      ingredient_ids: ing, custom_ingredients: [],
+    });
+    window._mealId = r?.meal_id;
+    go(r?.has_insight ? "D3" : "D4");
+  };
+  return <>
+    <Nav t="음식 확인" onBack={()=>go("D1")}/>
+    <div className="scroll">
+      <h1 className="q">{d.food_name}</h1>
+      <p className="sub">맞는 재료만 남겨주세요</p>
+      <div className="chips">
+        {d.ingredients.map(x=>
+          <button key={x.id} className={"chip"+(ing.includes(x.id)?" on":"")}
+            onClick={()=>setIng(ing.includes(x.id)?ing.filter(y=>y!==x.id):[...ing,x.id])}>{x.name}</button>)}
+        <button className="chip">+ 직접 추가</button>
+      </div>
+      <h1 className="q" style={{fontSize:17}}>얼마나 드셨나요?</h1>
+      <div style={{height:12}}/>
+      <div className="chips row">
+        {[["half","반"],["one","한 그릇"],["one_and_half_plus","한 그릇 반 이상"]].map(([k,l])=>
+          <button key={k} className={"chip"+(portion===k?" on":"")} onClick={()=>setPortion(k)}>{l}</button>)}
+      </div>
+      {d.has_broth && <>
+        <h1 className="q" style={{fontSize:17}}>국물도 드셨나요?</h1>
+        <div style={{height:12}}/>
+        <div className="chips row">
+          {[[true,"네"],[false,"아니요"]].map(([k,l])=>
+            <button key={String(k)} className={"chip"+(broth===k?" on":"")} onClick={()=>setBroth(k)}>{l}</button>)}
+        </div>
+      </>}
+    </div>
+    <Foot label="기록하기" onClick={submit}/>
+  </>;
+}
+
+// ── D3 참고 정보 ────────────────────────────────
+function D3({go}){
+  const d = useApi(()=>call("GET",`/meals/${window._mealId||91}/insight`),[]);
+  if(!d) return <Loading/>;
+  const o = d.observation;
+  return <>
+    <Nav t={d.food_name} onBack={()=>go("D2")}/>
+    <div className="scroll">
+      {d.note && <div className="note">🔍 {d.note}</div>}
+      {o && <div className="card">
+        <h3>{o.title}</h3>
+        <p>{o.body}</p>
+        {/* caveat 은 오면 무조건 그린다. 안 그리면 그게 판정이 된다. */}
+        {o.caveat && <div className="caveat">{o.caveat}</div>}
+      </div>}
+      <h1 className="q" style={{fontSize:17,marginTop:22,marginBottom:14}}>이렇게 하면 드실 수 있어요</h1>
+      {(d.suggestions||[]).map(s=>
+        <div className="step-item" key={s.rank}>
+          <div className="n">{s.rank}</div>
+          <div><div className="t">{s.title}</div><div className="d">{s.detail}</div></div>
+        </div>)}
+    </div>
+    <Foot label="확인" onClick={()=>go("D4")}/>
+  </>;
+}
+
+// ── E1 증상 기록 ────────────────────────────────
+const KINDS = ["배가 빵빵함","쥐어짜는 통증","급하게 화장실"];
+const LEVELS = [["none","없음"],["mild","조금"],["strong","많이"]];
+function E1({go}){
+  const [lv,setLv] = useState({});
+  const [onset,setOnset] = useState("about_1h");
+  const [loc,setLoc] = useState(null);
+  const [blood,setBlood] = useState(false);
+  return <>
+    <Nav t="증상 기록" onBack={()=>go("C")}/>
+    <div className="scroll">
+      <h1 className="q">어떤 불편함이 있었나요?</h1>
+      <div style={{height:6}}/>
+      {KINDS.map(k=>
+        <div key={k} style={{marginBottom:16}}>
+          <div style={{fontSize:14,fontWeight:500,marginBottom:8}}>{k}</div>
+          <div className="chips row" style={{marginBottom:0}}>
+            {LEVELS.map(([v,l])=>
+              <button key={v} className={"chip"+(lv[k]===v?" on":"")}
+                onClick={()=>setLv({...lv,[k]:v})}>{l}</button>)}
+          </div>
+        </div>)}
+      <h1 className="q" style={{fontSize:17,marginTop:20}}>언제부터 그러셨어요?</h1>
+      <div style={{height:12}}/>
+      <div className="chips">
+        {[["just_now","방금"],["about_1h","1시간쯤 전"],["since_morning","오전부터"],
+          ["since_yesterday","어제부터"]].map(([v,l])=>
+          <button key={v} className={"chip"+(onset===v?" on":"")} onClick={()=>setOnset(v)}>{l}</button>)}
+      </div>
+      <h1 className="q" style={{fontSize:17}}>어디가 불편하세요?</h1>
+      <div style={{height:12}}/>
+      <div className="chips row">
+        {[["upper","윗배 (명치 쪽)"],["lower","아랫배"]].map(([v,l])=>
+          <button key={v} className={"chip"+(loc===v?" on":"")} onClick={()=>setLoc(v)}>{l}</button>)}
+      </div>
+      <button className={"chip"+(blood?" on":"")} style={{width:"100%",borderRadius:12}}
+        onClick={()=>setBlood(!blood)}>변에 피가 섞여 있었어요</button>
+    </div>
+    <Foot label="다음" onClick={()=>{
+      window._sym = {
+        details: KINDS.filter(k=>lv[k]&&lv[k]!=="none").map(k=>({kind:k,level:lv[k]})),
+        onset, location: loc, blood_in_stool: blood };
+      go("E2");
+    }}/>
+  </>;
+}
+
+// ── E2 상황 확인 ────────────────────────────────
+const CTX = [["short_sleep","잠을 적게 잤어요"],["high_stress","스트레스를 많이 받았어요"],
+  ["overeating","평소보다 많이 먹었어요"],["alcohol","술을 마셨어요"],
+  ["menstruation","월경 기간이에요"],["none","특별한 변화는 없어요"]];
+function E2({go}){
+  const [c,setC] = useState([]);
+  const submit = async () => {
+    const r = await call("POST","/symptoms",{...(window._sym||{details:[],onset:"about_1h"}),contexts:c});
+    // 혈변이면 저장은 하되 즉시 병원 안내로 보낸다.
+    go(r?.red_flag ? "B1x" : "E3");
+  };
+  return <>
+    <Nav t="증상 기록" onBack={()=>go("E1")}/>
+    <div className="scroll">
+      <h1 className="q">오늘은 평소와 다른 점이 있었나요?</h1>
+      <p className="sub">불편함이 컸던 날에만 여쭤봐요. 해당 없으면 넘기셔도 괜찮아요.</p>
+      <div className="chips" style={{flexDirection:"column"}}>
+        {CTX.map(([k,l])=>
+          <button key={k} className={"chip"+(c.includes(k)?" on":"")}
+            style={{width:"100%",textAlign:"left",borderRadius:12}}
+            onClick={()=>setC(c.includes(k)?c.filter(x=>x!==k):[...c,k])}>{l}</button>)}
+      </div>
+      <div className="note">이걸 함께 남겨두면, 나중에 음식 때문인지 그날 상황 때문인지 구분할 수 있어요.</div>
+    </div>
+    <Foot label="기록하기" onClick={submit}/>
+  </>;
+}
+
+// ── E3 패턴 분석 ────────────────────────────────
+function E3({go}){
+  const d = useApi(()=>call("GET","/patterns"),[]);
+  if(d===undefined) return <Loading/>;
+  if(!d || !d.summary) return <>
+    <Nav t="오늘의 기록" onBack={()=>go("C")}/>
+    <div className="empty">아직 패턴을 말씀드리기엔 기록이 적어요.<br/>며칠 더 모아볼까요?</div>
+  </>;
+  return <>
+    <Nav t="오늘의 기록" onBack={()=>go("C")}/>
+    <div className="scroll">
+      <h1 className="q" style={{fontSize:18}}>{d.headline}</h1>
+      <p className="sub">{d.summary}</p>
+      {(d.timeline||[]).map((t,i)=>
+        <div className="card" key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div>
+            <div style={{fontSize:12,color:"var(--mute)",marginBottom:3}}>{t.time} {t.meal}</div>
+            <h3 style={{margin:0}}>{t.food}</h3>
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div style={{fontSize:12,color:"var(--mute)"}}>{t.ago}</div>
+            <div style={{fontSize:12,color:"var(--sage-d)",fontWeight:500}}>{t.phase}</div>
+          </div>
+        </div>)}
+      {!!(d.cofactors||[]).length && <>
+        <h1 className="q" style={{fontSize:16,marginTop:20,marginBottom:10}}>그날 함께 있었던 것</h1>
+        {d.cofactors.map((c,i)=>
+          <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"10px 0",
+            borderBottom:"1px solid var(--line)",fontSize:13.5}}>
+            <span>{c.label}</span><span style={{color:"var(--mute)"}}>{c.count}번</span>
+          </div>)}
+      </>}
+      {d.verdict && <div className="card" style={{marginTop:20,background:"var(--sage-l)",border:0}}>
+        <h3>{d.verdict.title}</h3>
+        <p style={{color:"var(--sage-d)"}}>{d.verdict.body}</p>
+        {d.verdict.action &&
+          <button className="btn" style={{marginTop:14}}
+            onClick={()=>go(d.verdict.action.screen)}>{d.verdict.action.label}</button>}
+      </div>}
+    </div>
+  </>;
+}
+
+// ── F1 도전 제안 ────────────────────────────────
+function F1({go}){
+  const d = useApi(()=>call("GET","/challenges/suggestion"),[]);
+  if(d===undefined) return <Loading/>;
+  if(!d) return <>
+    <Nav t="다시 먹어보기" onBack={()=>go("C")}/>
+    <div className="empty">지금은 제안드릴 게 없어요.<br/>기록이 조금 더 모이면 알려드릴게요.</div>
+  </>;
+  return <>
+    <Nav t="다시 먹어보기" onBack={()=>go("C")}/>
+    <div className="scroll">
+      <h1 className="q">{d.title}</h1>
+      <div className="card" style={{marginTop:16}}>
+        <h3>{d.reason.title}</h3><p>{d.reason.body}</p>
+      </div>
+      <h1 className="q" style={{fontSize:16,marginTop:20,marginBottom:14}}>이렇게 진행해요</h1>
+      {d.steps.map(s=>
+        <div className="step-item" key={s.seq}>
+          <div className="n">{s.seq}</div>
+          <div><div className="t">{s.title}</div><div className="d">{s.detail}</div></div>
+        </div>)}
+      {d.evidence && <div className="note" style={{marginTop:16,textAlign:"center"}}>
+        <div style={{fontSize:26,fontWeight:700,marginBottom:4}}>{d.evidence.figure}</div>
+        {d.evidence.text}
+      </div>}
+    </div>
+    <Foot label="시작할게요" onClick={()=>{window._ing=d.ingredient_id; window._ingName=d.ingredient_name; go("F2");}}
+      ghost={{label:"나중에",onClick:()=>go("C")}}/>
+  </>;
+}
+
+// ── F2 제한 설정 ────────────────────────────────
+function F2({go}){
+  const [days,setDays] = useState(3);
+  const [r,setR] = useState(null);
+  const name = window._ingName || "양파";
+  const submit = async () => {
+    const res = await call("POST","/challenges",{ingredient_id:window._ing||12,elimination_days:days});
+    window._ch = res?.challenge_id; setR(res);
+  };
+  useEffect(()=>{ submit(); },[]);   // contains 목록을 먼저 받아 보여준다
+  return <>
+    <Nav t={`${name} 확인하기`} onBack={()=>go("F1")}/>
+    <div className="scroll">
+      <h1 className="q">며칠간 {name}만 빼둘게요</h1>
+      <p className="sub">다른 음식은 평소대로 드셔도 돼요. {name} 하나만 잠깐 비워두는 거예요.</p>
+      <h1 className="q" style={{fontSize:17}}>얼마나 빼둘까요?</h1>
+      <div style={{height:12}}/>
+      <div className="chips row">
+        {[[3,"3일","가볍게"],[7,"7일","확실하게"]].map(([v,l,s])=>
+          <button key={v} className={"chip"+(days===v?" on":"")} style={{padding:"14px 0"}}
+            onClick={()=>setDays(v)}>
+            <div style={{fontWeight:700}}>{l}</div>
+            <div style={{fontSize:11,opacity:.7,marginTop:2}}>{s}</div>
+          </button>)}
+      </div>
+      {r?.contains && <>
+        <h1 className="q" style={{fontSize:16,marginBottom:12}}>이런 음식에 {name}이 들어있어요</h1>
+        <div className="chips">{r.contains.map(x=><span key={x} className="chip">{x}</span>)}</div>
+      </>}
+    </div>
+    <Foot label="이렇게 시작할게요" onClick={async()=>{ await submit(); go("F3"); }}/>
+  </>;
+}
+
+// ── F3 표적 도전 ────────────────────────────────
+function F3({go}){
+  const d = useApi(()=>call("GET",`/challenges/${window._ch||7}`),[]);
+  const [day,setDay] = useState(null);
+  if(!d) return <Loading/>;
+  const done = async (result) => {
+    const r = await call("POST",`/challenges/${window._ch||7}/attempts/${d.current_seq}`,
+      {result, tested_at:new Date().toISOString(), scheduled_date:day});
+    go(r?.finished ? "F4" : "F3");
+  };
+  return <>
+    <Nav t={`${d.ingredient_name} 확인하기`} onBack={()=>go("C")}/>
+    <div className="scroll">
+      <div className="step">{d.current_seq}번째 시도</div>
+      <h1 className="q" style={{fontSize:18}}>{d.instruction}</h1>
+      <p className="sub">{d.note}</p>
+      <h1 className="q" style={{fontSize:16,marginBottom:12}}>이번 주 가능한 날</h1>
+      <div className="chips">
+        {(d.available_days||[]).map(x=>
+          <button key={x} className={"chip"+(day===x?" on":"")} onClick={()=>setDay(x)}>
+            {new Date(x).toLocaleDateString("ko",{month:"numeric",day:"numeric",weekday:"short"})}
+          </button>)}
+      </div>
+      {d.excluded_note && <p className="sub" style={{marginTop:-12}}>{d.excluded_note}</p>}
+      {(d.attempts||[]).map(a=>
+        <div key={a.seq} style={{display:"flex",justifyContent:"space-between",padding:"11px 0",
+          borderBottom:"1px solid var(--line)",fontSize:13.5,
+          opacity:a.status==="upcoming"?.45:1}}>
+          <span>{a.seq}번째</span>
+          <span style={{color:a.status==="current"?"var(--sage-d)":"var(--mute)",
+                        fontWeight:a.status==="current"?700:400}}>{a.label}</span>
+        </div>)}
+      {/* reassurance 는 생략 불가. 도전 자체가 무섭다는 게 설문의 가장 큰 저항이었다. */}
+      {d.reassurance && <div className="note" style={{marginTop:18}}>🌿 {d.reassurance}</div>}
+      <div className="row" style={{marginTop:16}}>
+        <button className="chip" style={{flex:1,padding:14}} onClick={()=>done("reaction")}>불편했어요</button>
+        <button className="chip" style={{flex:1,padding:14}} onClick={()=>done("no_reaction")}>괜찮았어요</button>
+      </div>
+    </div>
+    <Foot label="다음에 할게요" onClick={()=>go("C")}/>
+  </>;
+}
+
+// ── F4 도전 결과 ────────────────────────────────
+function F4({go}){
+  const d = useApi(()=>call("GET",`/challenges/${window._ch||7}/result`),[]);
+  if(!d) return <Loading/>;
+  return <>
+    <Nav t="확인 결과" onBack={()=>go("C")}/>
+    <div className="scroll">
+      <div style={{textAlign:"center",padding:"20px 0 8px"}}>
+        <div style={{fontSize:34,fontWeight:700,color:"var(--sage)"}}>{d.ratio}</div>
+      </div>
+      <h1 className="q" style={{fontSize:18,textAlign:"center"}}>{d.headline}</h1>
+      <div style={{height:20}}/>
+      {(d.attempts||[]).map(a=>
+        <div key={a.seq} style={{display:"flex",justifyContent:"space-between",padding:"11px 0",
+          borderBottom:"1px solid var(--line)",fontSize:13.5}}>
+          <span>{a.seq}번째 · {a.date}</span>
+          <span style={{color:"var(--mute)"}}>{a.label}</span>
+        </div>)}
+      {/* grade 는 등급 문자열이다. 허용량 g 는 화면에 절대 안 나온다. */}
+      <div className="card" style={{marginTop:20,background:"var(--sage-l)",border:0}}>
+        <h3>{d.grade_label}</h3>
+        <p style={{color:"var(--sage-d)"}}>{d.body}</p>
+      </div>
+    </div>
+    <Foot label="나의 식탁에 저장하기" onClick={async()=>{
+      await call("POST",`/challenges/${window._ch||7}/save`); go("G"); }}/>
+  </>;
+}
+
+// ── G 나의 식탁 ────────────────────────────────
+function G({go}){
+  const d = useApi(()=>call("GET","/mytable"),[]);
+  if(!d) return <Loading/>;
+  return <>
+    <div className="nav">나의 식탁</div>
+    <div className="scroll">
+      {/* 숫자는 문장으로만. 게이지·진행 바로 그리지 않는다. */}
+      <h1 className="q" style={{fontSize:18}}>{d.headline}</h1>
+      <p className="sub">{d.sub}</p>
+      {(d.sections||[]).map(s=>
+        <div key={s.status} style={{marginBottom:26}}>
+          <h1 className="q" style={{fontSize:16,marginBottom:12}}>{s.title}</h1>
+          {s.items.map(it=>
+            <div className="card" key={it.id} style={{padding:"14px 16px",marginBottom:8,
+              display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{fontSize:14,fontWeight:500}}>{it.label}</div>
+                {it.note && <div style={{fontSize:12,color:"var(--mute)",marginTop:3}}>{it.note}</div>}
+                {it.hint && <div style={{fontSize:12,color:"var(--sage-d)",marginTop:2}}>{it.hint}</div>}
+              </div>
+              {it.action && <button className="chip on" style={{padding:"7px 12px",fontSize:12}}
+                onClick={()=>go(it.action.screen)}>{it.action.label}</button>}
+            </div>)}
+        </div>)}
+      {!!(d.saved_recommendations||[]).length && <>
+        <h1 className="q" style={{fontSize:16,marginBottom:12}}>저장한 추천</h1>
+        {d.saved_recommendations.map((r,i)=>
+          <div className="card" key={i} style={{padding:"14px 16px",cursor:"pointer"}}
+            onClick={()=>go("H2")}>{r.title}</div>)}
+      </>}
+    </div>
+    <div className="tabs">
+      <div onClick={()=>go("C")}>홈</div><div className="on">나의 식탁</div>
+    </div>
+  </>;
+}
+
+// ── H1 AI 대화 ─────────────────────────────────
+function H1({go}){
+  const [msgs,setMsgs] = useState([]);
+  const [txt,setTxt] = useState("");
+  const [sid,setSid] = useState(null);
+  const send = async (t) => {
+    if(!t.trim()) return;
+    setMsgs(m=>[...m,{role:"user",content:t}]); setTxt("");
+    const r = await call("POST","/chat/messages",{session_id:sid,text:t});
+    if(r?.session_id) setSid(r.session_id);
+    setMsgs(m=>[...m,{role:"assistant",content:r?.reply||"…",
+                      blocked:r?.blocked, suggestions:r?.suggestions||[]}]);
+  };
+  return <>
+    <Nav t="AI와 대화하기" onBack={()=>go("C")}/>
+    <div className="scroll" style={{paddingBottom:20}}>
+      {!msgs.length && <div className="empty">궁금한 걸 물어보세요.<br/>
+        <span style={{fontSize:12}}>기록을 바탕으로 도와드릴게요.</span></div>}
+      {msgs.map((m,i)=>
+        <div key={i}>
+          <div className={"bubble "+(m.role==="user"?"me":"ai")}>{m.content}</div>
+          {/* blocked 여도 입력을 막지 않는다. 계속 막는 건 서버가 한다. */}
+          {m.blocked && <div style={{fontSize:11,color:"var(--mute)",marginBottom:10}}>
+            의료 판단이 필요한 질문은 답하지 않아요</div>}
+          {(m.suggestions||[]).map((s,j)=>
+            <button key={j} className="chip" onClick={()=>go(s.screen)}>{s.label}</button>)}
+        </div>)}
+    </div>
+    <div style={{display:"flex",gap:8,padding:"12px 20px 22px",borderTop:"1px solid var(--line)",background:"#fff"}}>
+      <input value={txt} onChange={e=>setTxt(e.target.value)}
+        onKeyDown={e=>e.key==="Enter"&&send(txt)} placeholder="궁금한 걸 물어보세요"
+        style={{flex:1,border:"1px solid var(--line)",borderRadius:999,padding:"11px 16px",
+                font:"14px 'Noto Sans KR'",outline:"none"}}/>
+      <button className="btn" style={{width:44,padding:0,borderRadius:"50%"}} onClick={()=>send(txt)}>↑</button>
+    </div>
+  </>;
+}
+
+// ── H4 음식 대체안 ──────────────────────────────
+function H4({go}){
+  const d = useApi(()=>call("GET","/foods/9/alternatives"),[]);
+  if(!d) return <Loading/>;
+  return <>
+    <Nav t="음식 확인 결과" onBack={()=>go("C")}/>
+    <div className="scroll">
+      <h1 className="q">{d.food_name}</h1>
+      <p className="sub">확인된 재료</p>
+      <div className="chips">{d.ingredients.map(x=><span key={x} className="chip">{x}</span>)}</div>
+      <h1 className="q" style={{fontSize:17,marginBottom:14}}>이 음식, 어떻게 먹어볼까요?</h1>
+      {d.options.map(o=>
+        <div className="card" key={o.kind} style={{cursor:o.screen?"pointer":"default"}}
+          onClick={()=>o.screen&&go(o.screen)}>
+          <h3>{o.title}</h3><p>{o.detail}</p>
+        </div>)}
+    </div>
+    <Foot label="기록하기" onClick={()=>go("D4")}/>
+  </>;
+}
+
+// ── H3 성분 대체 ────────────────────────────────
+function H3({go}){
+  const d = useApi(()=>call("GET","/substitutions?ingredient_ids=12,15"),[]);
+  if(!d) return <Loading/>;
+  return <>
+    <Nav t="성분 대체 방법" onBack={()=>go("H4")}/>
+    <div className="scroll">
+      <h1 className="q" style={{fontSize:18,marginBottom:18}}>{d.intro}</h1>
+      {d.groups.map((g,i)=>
+        <div className="card" key={i}>
+          <div style={{fontSize:12,color:"var(--mute)",marginBottom:4}}>{g.ingredient}</div>
+          <h3 style={{color:"var(--sage-d)"}}>{g.replacement}</h3>
+          {g.alt && <p style={{marginTop:4}}>{g.alt}</p>}
+        </div>)}
+      <h1 className="q" style={{fontSize:16,marginTop:20,marginBottom:14}}>이렇게 먹어보세요</h1>
+      {d.tips.map(t=>
+        <div className="step-item" key={t.seq}>
+          <div className="n">{t.seq}</div>
+          <div><div className="t">{t.title}</div><div className="d">{t.detail}</div></div>
+        </div>)}
+    </div>
+  </>;
+}
+
+// ── H5 메뉴 대체 ────────────────────────────────
+function H5({go}){
+  const d = useApi(()=>call("GET","/foods/9/menu-alternatives"),[]);
+  if(!d) return <Loading/>;
+  return <>
+    <Nav t="대체 메뉴 제안" onBack={()=>go("H4")}/>
+    <div className="scroll">
+      <h1 className="q" style={{fontSize:18,marginBottom:18}}>{d.headline}</h1>
+      {d.items.map((x,i)=>
+        <div className="card" key={i}><h3>{x.name}</h3><p>{x.why}</p></div>)}
+      {d.has_more && <button className="btn ghost">더 많은 메뉴 보기</button>}
+    </div>
+  </>;
+}
+
+// ── H2 레시피 ──────────────────────────────────
+function H2({go}){
+  const d = useApi(()=>call("GET","/recipes/3"),[]);
+  if(!d) return <Loading/>;
+  return <>
+    <Nav t="대체 레시피" onBack={()=>go("G")}/>
+    <div className="scroll">
+      <h1 className="q">{d.title}</h1>
+      <p className="sub">재료 ({d.servings})</p>
+      {d.items.map((x,i)=>
+        <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"11px 0",
+          borderBottom:"1px solid var(--line)",fontSize:13.5}}>
+          <span>{x.name}{x.optional && <span style={{color:"var(--mute)"}}> (선택)</span>}</span>
+          <span style={{color:"var(--mute)"}}>{x.amount}</span>
+        </div>)}
+      {d.tip && <div className="note" style={{marginTop:20}}>TIP · {d.tip}</div>}
+    </div>
+    <Foot label="저장하기" onClick={()=>call("POST","/saved",{kind:"recipe",ref_id:3})}/>
+  </>;
+}
+
+// ══════════════════════════════════════════════
+function App(){
+  const [id,setId] = useState("A1");
+  const go = useCallback(s=>setId(s),[]);
+  return <div className="phone"><Screen id={id} go={go} key={id}/></div>;
+}
+function Panel(){
+  const [log,setLog] = useState([]);
+  const [cur,setCur] = useState("A1");
+  useEffect(()=>{ logSet = setLog; },[]);
+  useEffect(()=>{
+    const h = e => setCur(e.detail);
+    window.addEventListener("moru:nav",h); return ()=>window.removeEventListener("moru:nav",h);
+  },[]);
+  return <>
+    {ReactDOM.createPortal(
+      <>{FLOW.map(([k,label])=>
+        <button key={k} className={k===cur?"on":""}
+          onClick={()=>{ window._goto&&window._goto(k); setCur(k); }}>{k} {label}</button>)}</>,
+      document.getElementById("flow"))}
+    {log.map(r=>
+      <div className={"req"+(r.err?" err":"")} key={r.id}>
+        <div className="l1"><span className="code">{r.status}</span> {r.method} {r.path}
+          <span style={{color:"#6B655C",fontWeight:400}}> · {r.ms}ms</span></div>
+        <pre>{JSON.stringify(r.json,null,2)}</pre>
+      </div>)}
+  </>;
+}
+
+// 흐름 버튼이 화면을 바꿀 수 있게 연결
+function Root(){
+  const [id,setId] = useState("A1");
+  useEffect(()=>{ window._goto = setId; },[]);
+  const go = useCallback(s=>{ setId(s); window.dispatchEvent(new CustomEvent("moru:nav",{detail:s})); },[]);
+  return <div className="phone"><Screen id={id} go={go} key={id}/></div>;
+}
+
+ReactDOM.createRoot(document.getElementById("stage")).render(<Root/>);
+ReactDOM.createRoot(document.getElementById("log")).render(<Panel/>);
+</script>
+</body>
+</html>
