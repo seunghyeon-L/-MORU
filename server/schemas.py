@@ -22,12 +22,16 @@ AttemptResult = Literal["reaction", "no_reaction", "skipped"]
 # ── 온보딩 ────────────────────────────────────
 
 class SafetyIn(BaseModel):
+    """spec-04 V1-211 의 경고 신호 목록. 키는 services/safety.py 의 FLAGS 와 같다."""
+
     blood_in_stool: bool = False
     weight_loss: bool = False
-    anemia: bool = False
     night_symptoms: bool = False
-    family_history: bool = False
-    age_over_50: bool = False
+    fever: bool = False
+    vomiting: bool = False
+    anemia: bool = False
+    onset_after_50: bool = False        # "50세 이상" 이 아니라 "50세 이후 첫 발병"
+    cleared_by_doctor: bool = False     # V1-213 예외 — 진입 허용하되 기록은 남긴다
 
 
 class ProfileIn(BaseModel):

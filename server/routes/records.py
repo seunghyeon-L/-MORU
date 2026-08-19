@@ -4,10 +4,16 @@
 단, GET /meals/{id}/insight 의 본문 생성은 A-4 가 채운다 (관찰 + 교란 요인 병기).
 """
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from datetime import datetime, timezone
 
+from fastapi import APIRouter, Depends, File, UploadFile
+from sqlalchemy.orm import Session
+
+from db_session import get_db
 from deps import device_id, ex
+from models import SafetyScreening
 from schemas import IdentifyIn, MealIn, ResolveIn, SymptomIn
+from services import safety, users
 
 router = APIRouter(tags=["기록"])
 
@@ -116,19 +122,38 @@ async def _insight_stub():
         "symptom_log_id": 44,
         "red_flag": False,
         "followup_at": "2026-08-19T22:00:00+09:00",
+        "notice": None,
     }),
 )
-async def create_symptom(body: SymptomIn, dev: str = Depends(device_id)):
+async def create_symptom(
+    body: SymptomIn, dev: str = Depends(device_id), db: Session = Depends(get_db),
+):
     """red_flag 가 true 면 저장은 하되 프론트는 즉시 B1x 병원 안내로 보낸다.
+
+    SF-03 상시 감시 — 온보딩을 통과했어도 여기서 다시 걸릴 수 있다.
+    교수님 자문 15.2: "위험신호는 상시 감시해야지 입구에서 한 번 봐서는 안 된다"
 
     followup_at 에 "이제 좀 괜찮아지셨어요?" 푸시가 간다.
     아플 때 기록하고 나을 때는 기록하지 않기 때문에 2단계로 나눴다.
     """
+    v = safety.screen_symptom_log(body.blood_in_stool)
+
+    u = users.get_or_create(db, dev)
+    if v.blocked:
+        db.add(SafetyScreening(
+            user_id=u.id, has_blood_in_stool=True, blocked=True,
+            flags=v.flags, trigger_source="symptom_log",
+        ))
+        u.blocked_at = datetime.now(timezone.utc)
+        db.commit()
+
     # TODO(B-5): symptom_logs / symptom_details / symptom_contexts 저장
     return {
         "symptom_log_id": 44,
-        "red_flag": body.blood_in_stool,
+        "red_flag": v.blocked,
         "followup_at": "2026-08-19T22:00:00+09:00",
+        # 차단 시 B1x 에 띄울 문구. 온보딩 때와 문장이 다르다.
+        "notice": {"title": v.title, "body": v.body, "footer": v.footer} if v.blocked else None,
     }
 
 

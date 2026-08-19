@@ -188,16 +188,21 @@ function Screen({id,go}){
 
   case "B1": return <B1 go={go}/>;
 
-  case "B1x": return <>
-    <Nav t="안전 안내" onBack={()=>go("B1")}/>
-    <div className="scroll">
-      <div className="warn" style={{marginTop:20}}>
-        <b style={{display:"block",marginBottom:6,fontSize:14}}>먼저 병원에 가보시는 게 좋겠어요</b>
-        혈변은 앱으로 확인할 수 있는 범위를 넘어서요. 소화기내과 진료를 권해드려요.
+  case "B1x": {
+    // 문구는 서버가 준다. 온보딩에서 걸린 것과 사용 중 걸린 것의 문장이 다르다.
+    const b = window._block || {};
+    return <>
+      <Nav t="안전 안내" onBack={()=>go("B1")}/>
+      <div className="scroll">
+        <div className="warn" style={{marginTop:20}}>
+          <b style={{display:"block",marginBottom:6,fontSize:14}}>
+            {b.title || "먼저 병원에 가보시는 게 좋겠어요"}</b>
+          {b.body || "고르신 항목은 MORU가 확인할 수 있는 범위를 넘어서요."}
+        </div>
+        <p className="sub">{b.footer || "MORU는 질병을 진단하거나 치료하는 서비스가 아니에요."}</p>
       </div>
-      <p className="sub">MORU는 질병을 진단하거나 치료하는 서비스가 아니에요.</p>
-    </div>
-  </>;
+    </>;
+  }
 
   case "B2": return <B2 go={go}/>;
   case "B3": return <B3 go={go}/>;
@@ -245,34 +250,37 @@ function Screen({id,go}){
 }
 
 // ── B1 안전 확인 ────────────────────────────────
-const FLAGS = [
-  ["blood_in_stool","변에 피가 섞여 나온 적이 있어요"],
-  ["weight_loss","의도치 않게 체중이 줄었어요"],
-  ["anemia","빈혈 진단을 받은 적이 있어요"],
-  ["night_symptoms","자다가 증상 때문에 깨요"],
-  ["family_history","가족 중 장 질환 진단을 받은 분이 있어요"],
-  ["age_over_50","50세 이상이에요"],
-];
+// 항목도 문구도 서버가 준다. 앱을 새로 배포하지 않고 항목을 늘릴 수 있어야 한다.
 function B1({go}){
+  const q = useApi(()=>call("GET","/onboarding/safety/questions"),[]);
   const [sel,setSel] = useState([]);
+  const [cleared,setCleared] = useState(false);
+  if(!q) return <Loading/>;
   const submit = async () => {
-    const body = Object.fromEntries(FLAGS.map(([k])=>[k, sel.includes(k)]));
+    const body = Object.fromEntries(q.items.map(i=>[i.key, sel.includes(i.key)]));
+    body[q.exception.key] = cleared;
     const r = await call("POST","/onboarding/safety",body);
+    window._block = r;
     go(r && r.blocked ? "B1x" : "B2");
   };
   return <>
     <div className="scroll">
       <div className="step">1 / 4</div>
-      <h1 className="q">해당되는 것이 있나요?</h1>
-      <p className="sub">아래 중 하나라도 있으면 앱보다 병원이 먼저예요.</p>
+      <h1 className="q">{q.title}</h1>
+      <p className="sub">{q.sub}</p>
       <div className="chips" style={{flexDirection:"column"}}>
-        {FLAGS.map(([k,label]) =>
-          <button key={k} className={"chip"+(sel.includes(k)?" on":"")}
+        {q.items.map(i =>
+          <button key={i.key} className={"chip"+(sel.includes(i.key)?" on":"")}
             style={{width:"100%",textAlign:"left",borderRadius:12}}
-            onClick={()=>setSel(sel.includes(k)?sel.filter(x=>x!==k):[...sel,k])}>{label}</button>)}
+            onClick={()=>setSel(sel.includes(i.key)?sel.filter(x=>x!==i.key):[...sel,i.key])}>{i.label}</button>)}
       </div>
+      {/* V1-213 예외 — 고른 게 있을 때만 보여준다 */}
+      {!!sel.length &&
+        <button className={"chip"+(cleared?" on":"")}
+          style={{width:"100%",textAlign:"left",borderRadius:12}}
+          onClick={()=>setCleared(!cleared)}>{q.exception.label}</button>}
     </div>
-    <Foot label={sel.length?"다음":"해당 없어요"} onClick={submit}/>
+    <Foot label={sel.length?"다음":q.none_label} onClick={submit}/>
   </>;
 }
 
@@ -523,8 +531,8 @@ function E2({go}){
   const [c,setC] = useState([]);
   const submit = async () => {
     const r = await call("POST","/symptoms",{...(window._sym||{details:[],onset:"about_1h"}),contexts:c});
-    // 혈변이면 저장은 하되 즉시 병원 안내로 보낸다.
-    go(r?.red_flag ? "B1x" : "E3");
+    // 혈변이면 저장은 하되 즉시 병원 안내로 보낸다. (SF-03 상시 감시)
+    if(r?.red_flag){ window._block = r.notice; go("B1x"); } else go("E3");
   };
   return <>
     <Nav t="증상 기록" onBack={()=>go("E1")}/>
