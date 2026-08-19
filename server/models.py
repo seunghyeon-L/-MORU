@@ -30,6 +30,10 @@ PortionSize = ENUM("half", "one", "one_and_half_plus",
                    name="portion_size", create_type=False)
 InputMethod = ENUM("photo", "text", "search",
                    name="input_method", create_type=False)
+SymptomOnset = ENUM("just_now", "about_1h", "since_morning", "since_yesterday",
+                    name="symptom_onset", create_type=False)
+SymptomLocation = ENUM("upper", "lower", name="symptom_location", create_type=False)
+SymptomLevel = ENUM("none", "mild", "strong", name="symptom_level", create_type=False)
 
 
 class User(Base):
@@ -127,6 +131,37 @@ class MealIngredient(Base):
     ingredient_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("ingredients.id"), primary_key=True)
     added_by_user: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class SymptomLog(Base):
+    __tablename__ = "symptom_logs"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
+    logged_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    onset: Mapped[str] = mapped_column(SymptomOnset)
+    onset_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    location: Mapped[str | None] = mapped_column(SymptomLocation)
+    # RC-03 2단계 기록 — 후속 푸시로 나중에 채운다
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    blood_in_stool: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class SymptomDetail(Base):
+    __tablename__ = "symptom_details"
+
+    symptom_log_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("symptom_logs.id", ondelete="CASCADE"), primary_key=True)
+    kind: Mapped[str] = mapped_column(Text, primary_key=True)
+    level: Mapped[str] = mapped_column(SymptomLevel)
+
+
+class SymptomContext(Base):
+    __tablename__ = "symptom_contexts"
+
+    symptom_log_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("symptom_logs.id", ondelete="CASCADE"), primary_key=True)
+    factor: Mapped[str] = mapped_column(Text, primary_key=True)
 
 
 class UserAllergy(Base):

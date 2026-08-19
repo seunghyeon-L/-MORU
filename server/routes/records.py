@@ -12,10 +12,13 @@ from sqlalchemy.orm import Session
 
 from db_session import get_db
 from deps import device_id, ex
-from models import Ingredient, Meal, MealIngredient, SafetyScreening
+from models import (
+    Ingredient, Meal, MealIngredient, SafetyScreening,
+    SymptomContext, SymptomDetail, SymptomLog,
+)
 from schemas import IdentifyIn, MealIn, ResolveIn, SymptomIn
 from services import ingredients as ingredients_svc
-from services import llm, safety, users
+from services import llm, safety, symptoms, users
 
 router = APIRouter(tags=["기록"])
 
@@ -237,19 +240,36 @@ async def create_symptom(
     v = safety.screen_symptom_log(body.blood_in_stool)
 
     u = users.get_or_create(db, dev)
+    now = datetime.now(timezone.utc)
+
+    log = SymptomLog(
+        user_id=u.id,
+        onset=body.onset,
+        onset_at=symptoms.onset_at(body.onset, now),
+        location=body.location,
+        blood_in_stool=body.blood_in_stool,
+    )
+    db.add(log)
+    db.flush()  # log.id 를 받아와야 detail/context 를 연결할 수 있다
+
+    for d in body.details:
+        db.add(SymptomDetail(symptom_log_id=log.id, kind=d.kind, level=d.level))
+    for factor in body.contexts:
+        db.add(SymptomContext(symptom_log_id=log.id, factor=factor))
+
     if v.blocked:
         db.add(SafetyScreening(
             user_id=u.id, has_blood_in_stool=True, blocked=True,
             flags=v.flags, trigger_source="symptom_log",
         ))
-        u.blocked_at = datetime.now(timezone.utc)
-        db.commit()
+        u.blocked_at = now
 
-    # TODO(B-5): symptom_logs / symptom_details / symptom_contexts 저장
+    db.commit()
+
     return {
-        "symptom_log_id": 44,
+        "symptom_log_id": log.id,
         "red_flag": v.blocked,
-        "followup_at": "2026-08-19T22:00:00+09:00",
+        "followup_at": (now + symptoms.FOLLOWUP_DELAY).isoformat(),
         # 차단 시 B1x 에 띄울 문구. 온보딩 때와 문장이 다르다.
         "notice": {"title": v.title, "body": v.body, "footer": v.footer} if v.blocked else None,
     }
@@ -260,6 +280,13 @@ async def create_symptom(
     summary="후속 푸시를 눌렀을 때",
     responses=ex({"ok": True}),
 )
-async def resolve_symptom(log_id: int, body: ResolveIn, dev: str = Depends(device_id)):
-    # TODO(B-5)
+async def resolve_symptom(log_id: int, body: ResolveIn, dev: str = Depends(device_id),
+                          db: Session = Depends(get_db)):
+    u = users.get_or_create(db, dev)
+    log = db.query(SymptomLog).filter(
+        SymptomLog.id == log_id, SymptomLog.user_id == u.id,
+    ).one_or_none()
+    if log is not None:
+        log.resolved_at = body.resolved_at
+        db.commit()
     return {"ok": True}
