@@ -28,6 +28,9 @@ export const mockIngredients = {
   rice: { id: 'rice', name: '쌀' },
   greenTea: { id: 'green-tea', name: '녹차' },
   cabbage: { id: 'cabbage', name: '양배추' },
+  kimchi: { id: 'kimchi', name: '김치' },
+  tofu: { id: 'tofu', name: '두부' },
+  scallion: { id: 'scallion', name: '대파' },
 } satisfies Record<string, Ingredient>;
 
 /* ------------------------------------------------------------------ */
@@ -38,7 +41,14 @@ export const mockFoodItems: FoodItem[] = [
   {
     id: 'food-kimchi-jjigae',
     name: '김치찌개',
-    ingredients: [mockIngredients.onion, mockIngredients.garlic, mockIngredients.pork],
+    ingredients: [
+      mockIngredients.kimchi,
+      mockIngredients.pork,
+      mockIngredients.tofu,
+      mockIngredients.onion,
+      mockIngredients.garlic,
+      mockIngredients.scallion,
+    ],
     confirmedByUser: true,
   },
   {
