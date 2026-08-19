@@ -16,11 +16,11 @@ SQLAlchemy==2.0.36
 alembic==1.14.0                 # 스키마 마이그레이션 (팀 간 DB 동기화용)
 
 # LLM
-openai==3.3.0
-instructor==1.7.2               # 구조화 출력 + 검증 실패 시 자동 재시도
+openai==2.54.0
+instructor==1.15.4              # 구조화 출력 + 검증 실패 시 자동 재시도
 
 # 설정
 python-dotenv==1.2.3
 
 # 이미지 (서버 측 보조 처리)
-Pillow==11.1.0
+Pillow==12.3.0
