@@ -41,8 +41,8 @@ import type { ReintroductionCandidate, ReintroductionPlan } from '@/types/reintr
 import type { SymptomRecord } from '@/types/symptom';
 import type { UserProfile } from '@/types/user';
 
-/** TODO: 백엔드 연결 시 실제 base URL 로 교체 */
-export const API_BASE_URL = '';
+/** 공통 API client(apiClient.ts)의 base URL을 그대로 노출한다 — 중복 정의하지 않는다 */
+export { API_BASE_URL } from './apiClient';
 
 /** mock 데이터를 Promise 로 감싸기 위한 헬퍼 */
 function ok<T>(value: T): Promise<T> {
