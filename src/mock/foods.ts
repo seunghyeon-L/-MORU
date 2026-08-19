@@ -128,21 +128,27 @@ export const mockFoodRecords: FoodRecord[] = [
 export const mockAlternatives: Alternative[] = [
   {
     id: 'alt-1',
-    kind: 'menu',
-    title: '들깨 수제비',
-    description: '비슷한 국물 요리 중 양파가 들어가지 않는 메뉴예요.',
+    kind: 'method',
+    title: '소량부터 시도해보기',
+    description: '평소보다 조금만',
   },
   {
     id: 'alt-2',
-    kind: 'ingredient',
-    title: '양파 대신 대파 흰 부분',
-    description: '비슷한 단맛을 내면서 양파를 빼고 만들어 볼 수 있어요.',
+    kind: 'method',
+    title: '반 그릇만 드시기',
+    description: '국물은 조금, 건더기 위주로',
   },
   {
     id: 'alt-3',
-    kind: 'method',
-    title: '양파를 충분히 익혀서',
-    description: '오래 볶거나 끓이면 편하게 드셨다는 기록도 있어요.',
+    kind: 'ingredient',
+    title: '마늘 빼달라고 요청하기',
+    description: '식당에서도 대부분 가능해요',
+  },
+  {
+    id: 'alt-4',
+    kind: 'menu',
+    title: '다른 메뉴 골라보기',
+    description: '맑은 국 · 된장찌개',
   },
 ];
 
