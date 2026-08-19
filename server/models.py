@@ -24,6 +24,8 @@ TableStatus = ENUM("safe", "candidate", "to_try", "avoiding",
                    name="table_status", create_type=False)
 ChallengeStatus = ENUM("proposed", "eliminating", "testing", "done", "abandoned",
                        name="challenge_status", create_type=False)
+FodmapAxis = ENUM("fructan", "gos", "lactose", "fructose", "sorbitol", "mannitol",
+                  name="fodmap_axis", create_type=False)
 AttemptResult = ENUM("pending", "reaction", "no_reaction", "skipped",
                      name="attempt_result", create_type=False)
 PortionSize = ENUM("half", "one", "one_and_half_plus",
@@ -119,6 +121,7 @@ class Meal(Base):
     method: Mapped[str] = mapped_column(InputMethod)
     photo_path: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    fodmap_computed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class MealIngredient(Base):
@@ -163,6 +166,33 @@ class SymptomContext(Base):
         BigInteger, ForeignKey("symptom_logs.id", ondelete="CASCADE"), primary_key=True)
     factor: Mapped[str] = mapped_column(Text, primary_key=True)
 
+class IngredientFodmap(Base):
+    """재료 100g 당 6축 함량. 값이 없으면 행이 없다 — 0 과 미상은 다르다."""
+
+    __tablename__ = "ingredient_fodmap"
+
+    ingredient_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("ingredients.id", ondelete="CASCADE"), primary_key=True)
+    axis: Mapped[str] = mapped_column(FodmapAxis, primary_key=True)
+    grams_per_100g: Mapped[float] = mapped_column(Numeric(6, 3))
+    source: Mapped[str | None] = mapped_column(Text)
+
+
+class MealFodmap(Base):
+    """식사 1건의 6축 섭취 추정량.
+
+    ★ LLM 이 만든 값이 아니다. 결정론 코드 계산값만 들어간다 (원칙 ④).
+    ★ 이 숫자는 화면에 그대로 나가지 않는다 (원칙 ③).
+    """
+
+    __tablename__ = "meal_fodmap"
+
+    meal_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("meals.id", ondelete="CASCADE"), primary_key=True)
+    axis: Mapped[str] = mapped_column(FodmapAxis, primary_key=True)
+    grams: Mapped[float] = mapped_column(Numeric(7, 3))
+    # 0.0 = 전부 마스터 그램 / 1.0 = 전부 카테고리 평균으로 때움
+    estimated_ratio: Mapped[float] = mapped_column(Numeric(4, 3), default=0)
 
 class IngredientFodmap(Base):
     __tablename__ = "ingredient_fodmap"

@@ -18,7 +18,7 @@ from models import (
 )
 from schemas import IdentifyIn, MealIn, ResolveIn, SymptomIn
 from services import ingredients as ingredients_svc
-from services import llm, safety, symptoms, users
+from services import fodmap, llm, safety, symptoms, users
 
 router = APIRouter(tags=["기록"])
 
@@ -163,8 +163,11 @@ async def create_meal(body: MealIn, dev: str = Depends(device_id), db: Session =
 
     db.commit()
 
-    # TODO(A-3): 저장 직후 meal_fodmap 6축 계산
-    return {"meal_id": meal.id, "has_insight": bool(linked)}
+    # A-3 — 저장 직후 6축을 계산해 둔다.
+    # 나중에 몰아서 하면 패턴 분석이 계산 안 된 식사를 조용히 빼먹는다.
+    totals = fodmap.compute_meal(db, meal)
+
+    return {"meal_id": meal.id, "has_insight": bool(totals)}
 
 
 @router.get(
