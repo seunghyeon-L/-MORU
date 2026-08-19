@@ -15,10 +15,17 @@ export function ChatBubble({ message }: ChatBubbleProps) {
 
   return (
     <ThemedView style={[styles.row, isUser ? styles.rowEnd : styles.rowStart]}>
-      <ThemedView
-        type={isUser ? 'backgroundSelected' : 'backgroundElement'}
-        style={styles.bubble}>
-        <ThemedText type="small">{message.text}</ThemedText>
+      {!isUser ? (
+        <ThemedView type="brand" style={styles.avatar}>
+          <ThemedText type="caption" themeColor="textOnBrand">
+            M
+          </ThemedText>
+        </ThemedView>
+      ) : null}
+      <ThemedView type="surfaceCard" style={styles.bubble}>
+        <ThemedText type="bodyS" themeColor="textPrimary" style={styles.bubbleText}>
+          {message.text}
+        </ThemedText>
       </ThemedView>
     </ThemedView>
   );
@@ -27,6 +34,8 @@ export function ChatBubble({ message }: ChatBubbleProps) {
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
     paddingVertical: Spacing.one,
   },
   rowStart: {
@@ -35,9 +44,20 @@ const styles = StyleSheet.create({
   rowEnd: {
     justifyContent: 'flex-end',
   },
+  avatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   bubble: {
-    maxWidth: '80%',
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
+    maxWidth: '78%',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 18,
+  },
+  bubbleText: {
+    lineHeight: 22,
   },
 });
