@@ -33,8 +33,9 @@ export type SafetyFlag = (typeof SAFETY_FLAG_OPTIONS)[number]['id'];
 /**
  * 규칙 기반 안전 판정.
  * 하나라도 해당하면 의료기관 안내 화면으로 이동한다.
+ * B1 항목은 서버(GET /onboarding/safety/questions)에서 받아오므로 문자열 key 를 그대로 받는다.
  */
-export function needsMedicalReferral(flags: readonly SafetyFlag[]): boolean {
+export function needsMedicalReferral(flags: readonly string[]): boolean {
   return flags.length > 0;
 }
 
@@ -119,7 +120,8 @@ export type SymptomFrequency = (typeof SYMPTOM_FREQUENCY_OPTIONS)[number]['id'];
 /* ------------------------------------------------------------------ */
 
 export type OnboardingData = {
-  safetyFlags: SafetyFlag[];
+  /** B1 서버 응답의 항목 key 목록 (exception 포함 가능) */
+  safetyFlags: string[];
   /** medical 화면에서 "이미 병원에서 확인했어요"를 선택한 경우 true */
   medicalCheckConfirmed: boolean;
   allergies: Allergy[];

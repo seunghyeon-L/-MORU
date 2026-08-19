@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -7,34 +7,61 @@ import { BottomButton } from '@/components/common/BottomButton';
 import { Checkbox } from '@/components/common/Checkbox';
 import { OnboardingHeader } from '@/components/onboarding/OnboardingHeader';
 import { QuestionCard } from '@/components/onboarding/QuestionCard';
+import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useMoruData } from '@/hooks/useMoruData';
 import { Spacing } from '@/constants/theme';
-import { SAFETY_FLAG_OPTIONS, needsMedicalReferral, type SafetyFlag } from '@/types/onboarding';
+import { apiRequest } from '@/services/apiClient';
+import { needsMedicalReferral } from '@/types/onboarding';
+
+type SafetyQuestionItem = { key: string; label: string };
+type SafetyQuestions = {
+  title: string;
+  sub: string;
+  items: SafetyQuestionItem[];
+  exception: SafetyQuestionItem;
+  none_label: string;
+};
 
 /**
  * B1 온보딩 · 안전 확인.
  *
+ * 문항은 GET /onboarding/safety/questions 에서 받아온다.
  * 판정은 규칙 기반이며 AI를 사용하지 않는다 (needsMedicalReferral 참고).
- * "해당하는 것이 없어요" → 알레르기(B2), "하나라도 있어요" → 병원 안내(B1x).
+ * exception("이미 병원에서 확인했어요")을 선택하면 항목이 있어도 B2로 진행한다.
  */
 export default function SafetyScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { updateOnboarding } = useMoruData();
-  const [selected, setSelected] = useState<SafetyFlag[]>([]);
 
-  const toggle = (id: SafetyFlag) => {
-    setSelected((prev) => (prev.includes(id) ? prev.filter((flag) => flag !== id) : [...prev, id]));
+  const [data, setData] = useState<SafetyQuestions | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [exceptionSelected, setExceptionSelected] = useState(false);
+
+  useEffect(() => {
+    apiRequest<SafetyQuestions>('/onboarding/safety/questions')
+      .then(setData)
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[B1] GET /onboarding/safety/questions failed:', err);
+        setLoadError(true);
+      });
+  }, []);
+
+  const toggle = (key: string) => {
+    setSelected((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   };
 
   /**
-   * 두 버튼 모두 실제 체크된 위험 신호(selected)를 기준으로 판정한다.
-   * 라벨과 무관하게 선택된 항목이 있으면 항상 병원 안내로 이동한다.
+   * 두 버튼 모두 실제 체크 상태를 기준으로 판정한다.
+   * exception 을 선택했으면 다른 항목이 있어도 항상 B2로 진행한다.
    */
   const handleContinue = () => {
     updateOnboarding({ safetyFlags: selected });
-    router.push(needsMedicalReferral(selected) ? '/onboarding/medical' : '/onboarding/allergy');
+    const goToMedical = needsMedicalReferral(selected) && !exceptionSelected;
+    router.push(goToMedical ? '/onboarding/medical' : '/onboarding/allergy');
   };
 
   return (
@@ -47,26 +74,38 @@ export default function SafetyScreen() {
 
           <View style={styles.headerSpacer} />
 
-          <QuestionCard
-            question="먼저 확인할게요"
-            helperText={'아래 중 해당하는 것이 있다면 알려주세요.\nMORU보다 병원 진료가 먼저 필요할 수 있어요.'}>
-            <View style={styles.checklist}>
-              {SAFETY_FLAG_OPTIONS.map((option) => (
-                <Checkbox
-                  key={option.id}
-                  label={option.label}
-                  checked={selected.includes(option.id)}
-                  onChange={() => toggle(option.id)}
-                />
-              ))}
-            </View>
-          </QuestionCard>
+          {data ? (
+            <QuestionCard question={data.title} helperText={data.sub}>
+              <View style={styles.checklist}>
+                {data.items.map((item) => (
+                  <Checkbox
+                    key={item.key}
+                    label={item.label}
+                    checked={selected.includes(item.key)}
+                    onChange={() => toggle(item.key)}
+                  />
+                ))}
+
+                {selected.length > 0 ? (
+                  <Checkbox
+                    label={data.exception.label}
+                    checked={exceptionSelected}
+                    onChange={() => setExceptionSelected((prev) => !prev)}
+                  />
+                ) : null}
+              </View>
+            </QuestionCard>
+          ) : loadError ? (
+            <ThemedText type="bodyS" themeColor="textSecondary" style={styles.errorText}>
+              문항을 불러오지 못했어요. 잠시 후 다시 시도해주세요.
+            </ThemedText>
+          ) : null}
 
           <View style={styles.flex} />
         </View>
 
         <BottomButton
-          label="해당하는 것이 없어요"
+          label={data?.none_label ?? '해당하는 것이 없어요'}
           onPress={handleContinue}
           secondary={{ label: '하나라도 있어요', variant: 'secondary', onPress: handleContinue }}
         />
@@ -94,6 +133,9 @@ const styles = StyleSheet.create({
   },
   checklist: {
     gap: 7,
+  },
+  errorText: {
+    paddingTop: Spacing.three,
   },
   flex: {
     flex: 1,
