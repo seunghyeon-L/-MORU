@@ -18,6 +18,7 @@
 | **API 계약** (프론트가 볼 것) | `dev-03-api-contract.md` |
 | **챗봇 안전 테스트** | `dev-04-safety-test.md` |
 | **배포** | `dev-05-deploy.md` |
+| **발표 예상 질문** | `present-01-qna.md` |
 | **개발하며 신경 쓴 것** (인사이트) | `insights-02-engineering.md` |
 | **교수님 자문 원문** | `expert-02-professor-feedback.md` |
 | 교수님께 물어볼 질문 | `expert-01-questions.md` |
