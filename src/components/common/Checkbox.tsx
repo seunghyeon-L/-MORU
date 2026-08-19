@@ -5,16 +5,23 @@ import { ThemedView } from '@/components/themed-view';
 import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
 
+export type CheckboxTone = 'brand' | 'coral';
+
 export type CheckboxProps = {
   label: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
   disabled?: boolean;
+  /** 'coral' — 혈변 등 위험 신호처럼 색으로 주의를 끌어야 하는 항목에 사용 */
+  tone?: CheckboxTone;
 };
 
 /** 카드형 체크리스트 항목. Figma "안전 확인" 화면 기준 */
-export function Checkbox({ label, checked, onChange, disabled }: CheckboxProps) {
+export function Checkbox({ label, checked, onChange, disabled, tone = 'brand' }: CheckboxProps) {
   const theme = useTheme();
+  const accentColor = tone === 'coral' ? theme.coral : checked ? theme.brand : theme.brandLight;
+  const softBackground = tone === 'coral' ? 'coralLight' : 'brandSoft';
+  const fillBackground = tone === 'coral' ? 'coral' : 'brand';
 
   return (
     <Pressable
@@ -24,21 +31,20 @@ export function Checkbox({ label, checked, onChange, disabled }: CheckboxProps) 
       onPress={() => onChange(!checked)}
       style={({ pressed }) => (pressed || disabled) && styles.dimmed}>
       <ThemedView
-        type={checked ? 'brandSoft' : 'surfaceCard'}
-        style={[
-          styles.container,
-          { borderColor: checked ? theme.brand : theme.brandLight },
-        ]}>
+        type={checked ? softBackground : 'surfaceCard'}
+        style={[styles.container, { borderColor: accentColor }]}>
         <ThemedView
-          type={checked ? 'brand' : 'surfaceCard'}
-          style={[styles.box, { borderColor: checked ? theme.brand : theme.brandLight }]}>
+          type={checked ? fillBackground : 'surfaceCard'}
+          style={[styles.box, { borderColor: accentColor }]}>
           {checked ? (
             <ThemedText type="label" themeColor="textOnBrand">
               {'✓'}
             </ThemedText>
           ) : null}
         </ThemedView>
-        <ThemedText type="bodyS" themeColor={checked ? 'brandText' : 'textPrimary'}>
+        <ThemedText
+          type="bodyS"
+          themeColor={checked ? (tone === 'coral' ? 'textPrimary' : 'brandText') : 'textPrimary'}>
           {label}
         </ThemedText>
       </ThemedView>
