@@ -10,7 +10,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     ARRAY, BigInteger, Boolean, Date, DateTime, ForeignKey, Integer,
-    SmallInteger, String, Text, func,
+    Numeric, SmallInteger, String, Text, func,
 )
 from sqlalchemy.dialects.postgresql import ENUM, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -74,6 +74,28 @@ class Ingredient(Base):
     name: Mapped[str] = mapped_column(Text, unique=True)
     aliases: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
     category: Mapped[str | None] = mapped_column(Text)
+
+
+class Food(Base):
+    __tablename__ = "foods"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(Text, unique=True)
+    typical_grams: Mapped[float | None] = mapped_column(Numeric(7, 2))
+    has_broth: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class FoodIngredient(Base):
+    """B2 에서 미리 체크된 상태로 보여줄 기본 레시피."""
+
+    __tablename__ = "food_ingredients"
+
+    food_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("foods.id", ondelete="CASCADE"), primary_key=True)
+    ingredient_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("ingredients.id", ondelete="CASCADE"), primary_key=True)
+    grams: Mapped[float | None] = mapped_column(Numeric(7, 2))
+    in_broth: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class UserAllergy(Base):

@@ -4,6 +4,7 @@
 단, GET /meals/{id}/insight 의 본문 생성은 A-4 가 채운다 (관찰 + 교란 요인 병기).
 """
 
+import base64
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, UploadFile
@@ -13,7 +14,8 @@ from db_session import get_db
 from deps import device_id, ex
 from models import SafetyScreening
 from schemas import IdentifyIn, MealIn, ResolveIn, SymptomIn
-from services import safety, users
+from services import ingredients as ingredients_svc
+from services import llm, safety, users
 
 router = APIRouter(tags=["기록"])
 
@@ -32,16 +34,72 @@ _IDENTIFY_EXAMPLE = {
     "confidence": "high",
 }
 
+# B-4: 음식·재료 이름만 뽑는다. 판정이 아니라 입력이라 AI 를 써도 된다 (원칙 ④).
+_IDENTIFY_SYSTEM = """음식 사진이나 설명에서 음식 이름과 재료를 뽑는 도우미다.
+
+규칙:
+- 실제로 보이거나 언급된 것만 적는다. 확실하지 않으면 넣지 않는다.
+- 재료는 짧은 일반 명사로 쓴다 ('국내산 양파' 대신 '양파', '진라면' 대신 '라면').
+- 재료가 하나도 없으면 빈 배열을 돌려준다. 지어내지 않는다.
+"""
+
+_IDENTIFY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "food_name": {"type": "string"},
+        "has_broth": {"type": "boolean"},
+        "ingredients": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["food_name", "has_broth", "ingredients"],
+    "additionalProperties": False,
+}
+
+_IDENTIFY_EMPTY = {
+    "food_id": None, "food_name": "", "has_broth": False,
+    "ingredients": [], "confidence": "low",
+}
+
+
+def _resolve(db: Session, extracted: dict) -> dict:
+    """LLM 이 뽑은 이름을 마스터에 맞춰 응답 모양으로 만든다.
+
+    확정된 음식이 있으면 그 기본 레시피 재료를 미리 체크된 상태로 얹는다 (B2).
+    """
+    food = ingredients_svc.find_food(db, extracted["food_name"])
+    matched = ingredients_svc.match_many(db, extracted["ingredients"])
+    matched_ids = {i.id for i in matched}
+
+    if food is not None:
+        for d in ingredients_svc.default_ingredients(db, food.id):
+            if d.id not in matched_ids:
+                matched.append(d)
+                matched_ids.add(d.id)
+
+    return {
+        "food_id": food.id if food else None,
+        "food_name": food.name if food else extracted["food_name"],
+        "has_broth": food.has_broth if food else extracted.get("has_broth", False),
+        "ingredients": [{"id": i.id, "name": i.name, "checked": True} for i in matched],
+        # 마스터 음식과 재료가 하나라도 맞으면 high, 둘 다 불확실하면 low.
+        "confidence": "high" if (food is not None and matched) else "low",
+    }
+
 
 @router.post(
     "/meals/identify",
     summary="D1→D2 · 텍스트로 재료 식별",
     responses=ex(_IDENTIFY_EXAMPLE),
 )
-async def identify_text(body: IdentifyIn, dev: str = Depends(device_id)):
+async def identify_text(body: IdentifyIn, dev: str = Depends(device_id), db: Session = Depends(get_db)):
     """마스터에 없는 재료는 지어내지 않는다. 못 찾으면 ingredients 가 빈 배열로 온다."""
-    # TODO(B-4): OpenAI 구조화 출력 + ingredients.aliases 매칭
-    return _IDENTIFY_EXAMPLE
+    u = users.get_or_create(db, dev)
+    r = llm.structured(
+        db, purpose="identify_ingredients_text", model=llm.CLASSIFIER_MODEL,
+        system=_IDENTIFY_SYSTEM, user=body.text, schema=_IDENTIFY_SCHEMA, user_id=u.id,
+    )
+    if not r:
+        return {**_IDENTIFY_EMPTY, "food_name": body.text}
+    return _resolve(db, r)
 
 
 @router.post(
@@ -49,9 +107,22 @@ async def identify_text(body: IdentifyIn, dev: str = Depends(device_id)):
     summary="D1→D2 · 사진으로 재료 식별",
     responses=ex(_IDENTIFY_EXAMPLE),
 )
-async def identify_photo(photo: UploadFile = File(...), dev: str = Depends(device_id)):
-    # TODO(B-4): Vision 호출. 결과는 ai_calls 에 전량 로깅한다.
-    return _IDENTIFY_EXAMPLE
+async def identify_photo(photo: UploadFile = File(...), dev: str = Depends(device_id),
+                         db: Session = Depends(get_db)):
+    u = users.get_or_create(db, dev)
+    raw = await photo.read()
+    if not raw:
+        return _IDENTIFY_EMPTY
+
+    data_url = f"data:{photo.content_type or 'image/jpeg'};base64,{base64.b64encode(raw).decode()}"
+    r = llm.structured(
+        db, purpose="identify_ingredients_photo", model=llm.CLASSIFIER_MODEL,
+        system=_IDENTIFY_SYSTEM, user="이 사진 속 음식과 재료를 알려줘.",
+        schema=_IDENTIFY_SCHEMA, user_id=u.id, image_data_url=data_url,
+    )
+    if not r:
+        return _IDENTIFY_EMPTY
+    return _resolve(db, r)
 
 
 @router.post(
