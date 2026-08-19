@@ -62,3 +62,6 @@ docs/data/
 
 # 로컬 실행 설정
 .claude/
+
+# 발표 준비 — 개인용. 저장소에 올리지 않는다
+docs/present-*.html
