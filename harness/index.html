@@ -620,13 +620,15 @@ function F1({go}){
 // ── F2 제한 설정 ────────────────────────────────
 function F2({go}){
   const [days,setDays] = useState(3);
-  const [r,setR] = useState(null);
-  const name = window._ingName || "양파";
+  const ing = window._ing || 12;
+  // 화면 진입은 읽기만. 도전은 확정 버튼에서만 만든다.
+  const r = useApi(()=>call("GET",`/ingredients/${ing}/contains`),[ing]);
+  const name = window._ingName || r?.ingredient_name || "양파";
   const submit = async () => {
-    const res = await call("POST","/challenges",{ingredient_id:window._ing||12,elimination_days:days});
-    window._ch = res?.challenge_id; setR(res);
+    const res = await call("POST","/challenges",{ingredient_id:ing,elimination_days:days});
+    window._ch = res?.challenge_id;
+    go("F3");
   };
-  useEffect(()=>{ submit(); },[]);   // contains 목록을 먼저 받아 보여준다
   return <>
     <Nav t={`${name} 확인하기`} onBack={()=>go("F1")}/>
     <div className="scroll">
@@ -647,7 +649,7 @@ function F2({go}){
         <div className="chips">{r.contains.map(x=><span key={x} className="chip">{x}</span>)}</div>
       </>}
     </div>
-    <Foot label="이렇게 시작할게요" onClick={async()=>{ await submit(); go("F3"); }}/>
+    <Foot label="이렇게 시작할게요" onClick={submit}/>
   </>;
 }
 

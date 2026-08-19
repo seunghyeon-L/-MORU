@@ -54,22 +54,25 @@ async def suggestion(response: Response, dev: str = Depends(device_id)):
 
 @router.post(
     "",
-    summary="F2 제한 설정 확정 → 도전 시작",
+    summary="F2 확정 버튼을 눌렀을 때만 — 도전 생성",
     responses=ex({
         "challenge_id": 7,
         "status": "eliminating",
         "eliminate_until": "2026-08-22",
-        "contains": ["김치찌개", "제육볶음", "카레", "샌드위치", "샐러드"],
     }),
 )
 async def create(body: ChallengeIn, dev: str = Depends(device_id)):
-    """contains 가 F2 하단 '이런 음식에 양파가 들어있어요'."""
+    """쓰기다. F2 화면에 들어왔다는 이유로 부르면 안 된다.
+
+    사용자가 "이렇게 시작할게요" 를 누른 순간에만 부른다.
+    F2 가 보여줄 '이런 음식에 양파가 들어있어요' 목록은
+    GET /ingredients/{id}/contains 로 따로 읽는다.
+    """
     # TODO(A-5)
     return {
         "challenge_id": 7,
         "status": "eliminating",
         "eliminate_until": "2026-08-22",
-        "contains": ["김치찌개", "제육볶음", "카레", "샌드위치", "샐러드"],
     }
 
 

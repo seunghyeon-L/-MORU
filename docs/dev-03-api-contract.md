@@ -264,18 +264,28 @@ X-Device-Id: <앱이 최초 실행 시 생성해 기기에 저장한 UUID>
 
 제안할 게 없으면 `204 No Content`. 알레르기·셀리악 항목은 **절대 제안에 나오지 않습니다.**
 
-### `POST /challenges` — F2 제한 설정 확정
+### `GET /ingredients/{id}/contains` — F2 화면 진입 시
+
+```json
+{ "ingredient_name": "양파",
+  "contains": ["김치찌개","제육볶음","카레","샌드위치","샐러드"] }
+```
+
+F2 하단 "이런 음식에 양파가 들어있어요". **읽기 전용입니다.**
+사용자가 3일/7일을 바꿔가며 봐도 아무것도 생기지 않습니다.
+
+### `POST /challenges` — F2 "이렇게 시작할게요" 를 눌렀을 때만
 
 ```json
 // 요청  { "ingredient_id": 12, "elimination_days": 3 }     // 3 | 7
 // 응답
 { "challenge_id": 7,
   "status": "eliminating",
-  "eliminate_until": "2026-08-22",
-  "contains": ["김치찌개","제육볶음","카레","샌드위치","샐러드"] }
+  "eliminate_until": "2026-08-22" }
 ```
 
-`contains` 가 F2 하단 "이런 음식에 양파가 들어있어요".
+**쓰기입니다. 화면에 들어왔다는 이유로 부르면 안 됩니다.**
+확정 버튼을 누른 순간에만 부릅니다.
 
 ### `GET /challenges/{id}` — F3 진행
 
@@ -449,6 +459,8 @@ LLM 은 사용자 기록과 계산 결과만 압니다. 일반 의학 지식으�
 3. **빈 상태를 반드시 그려야 합니다.** `/home` 의 `cards: []`, `/patterns` 의 `summary: null`, `/challenges/suggestion` 의 `204`
 4. **`caveat`·`reassurance` 필드는 있으면 무조건 그립니다.** 안전 장치라 생략하면 안 됩니다
 5. **점수·게이지·진행 바 금지.** 서버가 수치를 주는 곳(`ratio: "2/3"`, "6가지")도 문장으로만 씁니다
+6. **화면 진입은 GET, 확정 버튼은 POST.** 화면에 들어왔다는 이유로 POST 를 부르지 마세요.
+   설정을 바꿔가며 미리보기가 필요하면 그건 항상 GET 입니다 (예: F2 의 `/ingredients/{id}/contains`)
 
 ---
 

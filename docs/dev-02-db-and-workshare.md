@@ -61,6 +61,7 @@ A1~G 화면 이름·구조가 `spec-04-function-list.md` 와 동일하다. 따�
 | B-4 | 사진→재료 식별 API | `ai_calls` | D1 사진 입력 |
 | B-5 | 증상 기록 CRUD | `symptom_logs`, `symptom_details`, `symptom_contexts` | E0~E2 |
 | B-6 | 대체안 마스터 + 조회 API | `substitutions`, `recipes`, `recipe_items`, `menu_alternatives`, `saved_recommendations` | H2·H3·H5 |
+| B-8 | 재료 역조회 — 이 재료가 든 음식 | `food_ingredients` (읽기) | F2 |
 | B-7 | 나의 식탁 **조회** API | `my_table_items` (읽기만) | G |
 
 **B-1 을 첫날에 끝내야 한다.** 이게 없으면 내가 계산 로직을 못 짠다.

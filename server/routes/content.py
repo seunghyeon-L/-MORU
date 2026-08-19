@@ -13,6 +13,27 @@ router = APIRouter(tags=["대체안"])
 
 
 @router.get(
+    "/ingredients/{ingredient_id}/contains",
+    summary="F2 · 이 재료가 들어있는 음식 목록 (읽기 전용)",
+    responses=ex({
+        "ingredient_name": "양파",
+        "contains": ["김치찌개", "제육볶음", "카레", "샌드위치", "샐러드"],
+    }),
+)
+async def contains(ingredient_id: int, dev: str = Depends(device_id)):
+    """food_ingredients 를 재료로 역조회한다.
+
+    F2 화면 진입 시 부른다. 도전을 만들지 않는다 —
+    3일/7일을 바꿔가며 봐도 아무것도 생기지 않아야 한다.
+    """
+    # TODO(B-6): food_ingredients JOIN foods, 자주 먹는 순 정렬, 상위 5~8개
+    return {
+        "ingredient_name": "양파",
+        "contains": ["김치찌개", "제육볶음", "카레", "샌드위치", "샐러드"],
+    }
+
+
+@router.get(
     "/foods/{food_id}/alternatives",
     summary="H4 음식 기반 대체안 — 4갈래",
     responses=ex({
