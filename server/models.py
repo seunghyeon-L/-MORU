@@ -9,10 +9,10 @@ server/db/schema.sql 이 원본이다. 스키마를 바꿀 때는 SQL 을 먼저
 from datetime import date, datetime
 
 from sqlalchemy import (
-    ARRAY, BigInteger, Boolean, Date, DateTime, ForeignKey, SmallInteger,
-    String, Text, func,
+    ARRAY, BigInteger, Boolean, Date, DateTime, ForeignKey, Integer,
+    SmallInteger, String, Text, func,
 )
-from sqlalchemy.dialects.postgresql import ENUM
+from sqlalchemy.dialects.postgresql import ENUM, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from db_session import Base
@@ -134,3 +134,50 @@ class BusyDay(Base):
     user_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     day: Mapped[date] = mapped_column(Date, primary_key=True)
+
+
+# ═══════════════════════════════════════════
+#  A-7 챗봇 하네스
+# ═══════════════════════════════════════════
+
+ChatRole = ENUM("user", "assistant", name="chat_role", create_type=False)
+
+
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    session_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("chat_sessions.id", ondelete="CASCADE"))
+    role: Mapped[str] = mapped_column(ChatRole)
+    content: Mapped[str] = mapped_column(Text)
+    # 하네스 흔적. 사후 감사를 위해 전부 남긴다.
+    blocked_reason: Mapped[str | None] = mapped_column(Text)
+    llm_called: Mapped[bool] = mapped_column(Boolean, default=False)
+    retry_count: Mapped[int] = mapped_column(SmallInteger, default=0)
+    fell_back: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AiCall(Base):
+    """모든 LLM 호출 원문. 하네스가 왜 통과/차단했는지 따질 수 있어야 한다."""
+
+    __tablename__ = "ai_calls"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(BigInteger)
+    purpose: Mapped[str] = mapped_column(Text)
+    model: Mapped[str] = mapped_column(Text)
+    prompt: Mapped[dict] = mapped_column(JSONB)
+    raw_response: Mapped[str | None] = mapped_column(Text)
+    parsed_ok: Mapped[bool | None] = mapped_column(Boolean)
+    latency_ms: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
