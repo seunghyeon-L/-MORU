@@ -1,32 +1,34 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image, Linking, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BottomButton } from '@/components/common/BottomButton';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useMoruData } from '@/hooks/useMoruData';
 import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
-import { SAFETY_FLAG_OPTIONS } from '@/types/onboarding';
 
 const illustration = require('@/assets/images/illustrations/onboarding-medical.png');
 
 /**
  * B1x 안전 · 병원 안내 (차단).
  *
- * 의료적 진단/판단은 하지 않는다. 여기서 서비스 진입을 막되,
+ * 문구(title/body/footer)와 선택 항목(flags)은 B1의 POST /onboarding/safety
+ * 응답을 그대로 전달받아 표시한다 — 프론트에서 재조합하지 않는다.
  * "이미 병원에서 확인했어요"를 선택하면 온보딩을 이어갈 수 있다.
  */
 export default function MedicalScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
-  const { onboarding } = useMoruData();
+  const { title, body, footer, flags } = useLocalSearchParams<{
+    title?: string;
+    body?: string;
+    footer?: string;
+    flags?: string;
+  }>();
 
-  const selectedLabels = SAFETY_FLAG_OPTIONS.filter((option) =>
-    onboarding.safetyFlags.includes(option.id),
-  ).map((option) => option.label);
+  const selectedFlags = flags ? flags.split(',').filter(Boolean) : [];
 
   const openNearbyHospitalSearch = () => {
     const url = Platform.select({
@@ -48,11 +50,11 @@ export default function MedicalScreen() {
           </View>
 
           <ThemedText type="h1" themeColor="textPrimary" style={styles.headline}>
-            {'먼저 병원에서\n확인해주세요'}
+            {title}
           </ThemedText>
 
           <ThemedText type="bodyM" themeColor="textSecondary" style={styles.description}>
-            {'말씀해주신 증상은 식이 관리보다\n진료가 먼저 필요할 수 있어요.'}
+            {body}
           </ThemedText>
 
           <ThemedView
@@ -62,11 +64,11 @@ export default function MedicalScreen() {
               선택하신 항목
             </ThemedText>
             <View style={styles.reasonList}>
-              {(selectedLabels.length > 0 ? selectedLabels : ['해당 항목 확인 중']).map((label) => (
-                <View key={label} style={styles.reasonRow}>
+              {(selectedFlags.length > 0 ? selectedFlags : ['해당 항목 확인 중']).map((flag) => (
+                <View key={flag} style={styles.reasonRow}>
                   <ThemedView type="brand" style={styles.dot} />
                   <ThemedText type="label" themeColor="textPrimary">
-                    {label}
+                    {flag}
                   </ThemedText>
                 </View>
               ))}
@@ -76,7 +78,7 @@ export default function MedicalScreen() {
           <View style={styles.flex} />
 
           <ThemedText type="caption" themeColor="textMuted" style={styles.footNote}>
-            진료 후 다시 오시면 언제든 함께할게요.
+            {footer}
           </ThemedText>
 
           <View style={styles.spacer14} />

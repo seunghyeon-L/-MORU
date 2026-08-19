@@ -23,6 +23,15 @@ type SafetyQuestions = {
   none_label: string;
 };
 
+/** POST /onboarding/safety 응답 — blocked 여부와 B1x에 그대로 전달할 문구 */
+type SafetyScreenResult = {
+  blocked: boolean;
+  flags: string[];
+  title: string;
+  body: string;
+  footer: string;
+};
+
 /**
  * B1 온보딩 · 안전 확인.
  *
@@ -39,6 +48,8 @@ export default function SafetyScreen() {
   const [loadError, setLoadError] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [exceptionSelected, setExceptionSelected] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [postError, setPostError] = useState(false);
 
   useEffect(() => {
     apiRequest<SafetyQuestions>('/onboarding/safety/questions')
@@ -56,12 +67,58 @@ export default function SafetyScreen() {
 
   /**
    * 두 버튼 모두 실제 체크 상태를 기준으로 판정한다.
-   * exception 을 선택했으면 다른 항목이 있어도 항상 B2로 진행한다.
+   * 선택된 항목이 없으면(해당 없어요) POST 없이 바로 B2로 이동한다.
+   * 선택된 항목이 있으면 POST /onboarding/safety 로 서버에 판정을 맡기고,
+   * 응답의 blocked 값을 그대로 따른다 (프론트에서 다시 판단하지 않는다).
    */
-  const handleContinue = () => {
-    updateOnboarding({ safetyFlags: selected });
-    const goToMedical = needsMedicalReferral(selected) && !exceptionSelected;
-    router.push(goToMedical ? '/onboarding/medical' : '/onboarding/allergy');
+  const handleContinue = async () => {
+    if (submitting) return;
+
+    if (!needsMedicalReferral(selected)) {
+      updateOnboarding({ safetyFlags: [] });
+      router.push('/onboarding/allergy');
+      return;
+    }
+
+    if (!data) return;
+
+    setPostError(false);
+    setSubmitting(true);
+    try {
+      // GET 응답의 key 를 그대로 사용해 요청 body 를 만든다 (하드코딩된 목록 사용 안 함)
+      const payload: Record<string, boolean> = {};
+      data.items.forEach((item) => {
+        payload[item.key] = selected.includes(item.key);
+      });
+      payload[data.exception.key] = exceptionSelected;
+
+      const result = await apiRequest<SafetyScreenResult>('/onboarding/safety', {
+        method: 'POST',
+        body: payload,
+      });
+
+      updateOnboarding({ safetyFlags: result.flags });
+
+      if (result.blocked) {
+        router.push({
+          pathname: '/onboarding/medical',
+          params: {
+            title: result.title,
+            body: result.body,
+            footer: result.footer,
+            flags: result.flags.join(','),
+          },
+        });
+      } else {
+        router.push('/onboarding/allergy');
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[B1] POST /onboarding/safety failed:', err);
+      setPostError(true);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -101,13 +158,25 @@ export default function SafetyScreen() {
             </ThemedText>
           ) : null}
 
+          {postError ? (
+            <ThemedText type="bodyS" themeColor="textSecondary" style={styles.errorText}>
+              전송에 실패했어요. 잠시 후 다시 시도해주세요.
+            </ThemedText>
+          ) : null}
+
           <View style={styles.flex} />
         </View>
 
         <BottomButton
           label={data?.none_label ?? '해당하는 것이 없어요'}
+          disabled={submitting}
           onPress={handleContinue}
-          secondary={{ label: '하나라도 있어요', variant: 'secondary', onPress: handleContinue }}
+          secondary={{
+            label: '하나라도 있어요',
+            variant: 'secondary',
+            disabled: submitting,
+            onPress: handleContinue,
+          }}
         />
       </ThemedView>
     </ScrollView>
