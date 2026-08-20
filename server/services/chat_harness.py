@@ -280,13 +280,32 @@ def build_context(db: Session, user: User) -> str:
     #   전에는 관찰만 주고 시스템 프롬프트로 "다른 요인도 말해라" 라고만 했다.
     #   데이터를 안 주니 LLM 이 지킬 방법이 없었고, 실제로 통과한 답변에서
     #   교란 요인을 병기한 경우가 한 건도 없었다. 절대 원칙 ① 위반이다.
-    for s in patterns.ingredient_stats(db, user.id):
-        if s["speakable"]:
-            cos = patterns.cofactors(db, s["hit_logs"])
-            tail = (" / 그날 함께 있었던 것: "
-                    + ", ".join(f"{c['label']} {c['count']}번" for c in cos)) if cos else ""
-            lines.append(f"- 관찰: {w(s['name'], '이')} 든 식사 {s['meals']}번 중 "
-                         f"{s['hits']}번 뒤에 불편함 기록 (인과는 확인되지 않음){tail}")
+    def _observed(name: str, meals: int, hits: int, logs: list, unit: str) -> str:
+        cos = patterns.cofactors(db, logs)
+        tail = (" / 그날 함께 있었던 것: "
+                + ", ".join(f"{c['label']} {c['count']}번" for c in cos)) if cos else ""
+        return (f"- 관찰: {name}{unit} {meals}번 중 {hits}번 뒤에 불편함 기록 "
+                f"(인과는 확인되지 않음){tail}")
+
+    ing = [s for s in patterns.ingredient_stats(db, user.id) if s["speakable"]]
+    for s in ing:
+        lines.append(_observed(w(s["name"], "이"), s["meals"], s["hits"],
+                               s["hit_logs"], " 든 식사"))
+
+    # 재료를 못 짚을 때는 음식 단위로 말한다.
+    #
+    # E3(분석 화면)은 이미 그렇게 하고 있었다 — 김치찌개의 프럭탄이
+    # 양파·마늘·김치로 3등분돼서 재료로는 아무도 기준을 못 넘을 때,
+    # "김치찌개 6번 중 4번" 은 여전히 사실이라 화면에 띄운다.
+    # 그런데 챗봇 컨텍스트에는 재료 관찰만 넣고 있었다.
+    # 같은 사용자가 화면에서는 "6번 중 4번" 을 보고,
+    # 챗봇에 물으면 그런 기록이 없다는 듯한 답을 받았다.
+    # 한 데이터에 두 이야기가 나오면 둘 다 못 믿게 된다.
+    if not ing:
+        for f in patterns.food_stats(db, user.id):
+            if f["speakable"]:
+                lines.append(_observed(w(f["name"], "을"), f["meals"], f["hits"],
+                                       f["hit_logs"], " 드신"))
 
     # 사용자가 남긴 상황 요인 전체 — "제 기록에 수면 정보 있나요" 에 없다고 답하던 것
     all_ctx = patterns.cofactors(db, [
