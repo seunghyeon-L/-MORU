@@ -41,3 +41,6 @@ example
 # generated native folders
 /ios
 /android
+
+# 세션 작업 중 생기는 백업
+*.bak-*

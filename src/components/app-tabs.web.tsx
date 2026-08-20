@@ -103,7 +103,7 @@ export function TabButton({ children, isFocused, name, ...props }: TabButtonProp
         {name === 'record' ? <CameraIcon size={24} color={color} /> : null}
         {name === 'home' ? (
           <SymbolView
-            name={{ ios: 'house', android: 'home', web: 'home' }}
+            name={'house' as never}
             type="monochrome"
             weight="light"
             size={24}

@@ -87,10 +87,25 @@ function GridOption({
  * 2단계(E2) — 오늘 평소와 다른 점(교란 변수). 두 단계 모두 별도 route를 늘리지 않고
  * 이 화면 안에서 local step 으로 전환한다.
  */
+/**
+ * 화면의 상황 요인 id → 서버 API 키.
+ * 여기에 없는 항목(기타·특별한 변화 없음)은 보내지 않는다 —
+ * 집계에 쓸 정보가 없기 때문이다.
+ */
+const CONTEXT_FACTOR_TO_API: Partial<Record<ContextFactor, string>> = {
+  'poor-sleep': 'short_sleep',
+  stress: 'high_stress',
+  'large-meal': 'overeating',
+  alcohol: 'alcohol',
+  menstruation: 'menstruation',
+  'irregular-meal': 'irregular_meal',
+  'busy-schedule': 'busy_schedule',
+};
+
 export default function SymptomDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { addSymptomRecord } = useMoruData();
+  const { refreshRecords } = useMoruData();
   const { severity: severityParam } = useLocalSearchParams<{ severity?: string }>();
   const severity = (Number(severityParam) || 7) as Severity;
 
@@ -159,12 +174,13 @@ export default function SymptomDetailScreen() {
     const symptoms = SYMPTOM_CHECK_ITEMS.filter(
       (item) => intensities[item.id] && intensities[item.id] !== 'none',
     ).map((item) => item.id);
-    const contextLabels = factors
-      .filter((factor) => factor !== 'none-change')
-      .flatMap((factor) => {
-        const label = CONTEXT_FACTOR_OPTIONS.find((option) => option.id === factor)?.label;
-        return label ? [label] : [];
-      });
+    // 서버에는 한국어 라벨이 아니라 API 키를 보낸다.
+    // 라벨을 보내면 패턴 분석이 교란 요인을 문장에 끼울 때
+    // "잠을 적게 잤어요가 겹친 날이 많아서" 처럼 깨진다.
+    const contextKeys = factors.flatMap((factor) => {
+      const key = CONTEXT_FACTOR_TO_API[factor];
+      return key ? [key] : [];
+    });
 
     try {
       const response = await api.logSymptom({
@@ -175,25 +191,10 @@ export default function SymptomDetailScreen() {
         onset: ONSET_TO_API[onset],
         location,
         blood_in_stool: hasBloodInStool,
-        contexts: contextLabels,
+        contexts: contextKeys,
       });
 
-      // 최근 기록(기록 탭) 표시용 — 서버 저장과 별개로 로컬에도 남겨둔다
-      await addSymptomRecord({
-        id: `symptom-${Date.now()}`,
-        recordedAt: now,
-        state: 'uncomfortable',
-        detail: {
-          symptoms,
-          symptomIntensities: intensities,
-          occurredAt: now,
-          onset,
-          location,
-          hasBloodInStool,
-          severity,
-          contextFactors: factors.filter((factor) => factor !== 'none-change'),
-        },
-      });
+      await refreshRecords();   // 저장이 끝났으니 목록을 다시 받아온다
 
       if (response.red_flag && response.notice) {
         router.push({

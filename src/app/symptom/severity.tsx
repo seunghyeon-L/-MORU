@@ -9,6 +9,7 @@ import { SeveritySelector } from '@/components/symptom/SeveritySelector';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useMoruData } from '@/hooks/useMoruData';
+import * as api from '@/services/api';
 import { Spacing } from '@/constants/theme';
 import type { OverallState, Severity } from '@/types/symptom';
 
@@ -28,7 +29,7 @@ function stateFromSeverity(value: Severity): OverallState {
 export default function SymptomSeverityScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { addSymptomRecord } = useMoruData();
+  const { refreshRecords } = useMoruData();
   const [severity, setSeverity] = useState<Severity>();
   const [saving, setSaving] = useState(false);
 
@@ -43,13 +44,26 @@ export default function SymptomSeverityScreen() {
     }
 
     setSaving(true);
-    const now = new Date().toISOString();
-    await addSymptomRecord({
-      id: `symptom-${Date.now()}`,
-      recordedAt: now,
-      state: stateFromSeverity(severity),
-      detail: { symptoms: [], occurredAt: now, severity, contextFactors: [] },
-    });
+    try {
+      // 강도가 낮아 여기서 끝나는 경우에도 서버에 남긴다.
+      // 전에는 로컬에만 쌓여서 앱을 껐다 켜면 사라졌다.
+      //
+      // 증상 강도는 전부 'none' 으로 보낸다 — 불편함이 없었다는 뜻이다.
+      // 서버는 이런 기록을 "반응 있었음" 으로 세지 않는다.
+      await api.logSymptom({
+        details: [],
+        onset: 'just_now',
+        location: null,
+        blood_in_stool: false,
+        contexts: [],
+      });
+      await refreshRecords();
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[E0] POST /symptoms failed:', err);
+    } finally {
+      setSaving(false);
+    }
     router.replace('/(tabs)/record');
   };
 

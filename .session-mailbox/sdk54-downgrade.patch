@@ -1,0 +1,105 @@
+diff -ru src/app/_layout.tsx src/app/_layout.tsx
+--- a/src/app/_layout.tsx	2026-08-20 16:04:46.275185700 +0900
++++ b/src/app/_layout.tsx	2026-08-20 17:26:08.747179500 +0900
+@@ -1,4 +1,5 @@
+-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
++import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
++import { Stack } from 'expo-router';
+ import * as SplashScreen from 'expo-splash-screen';
+ import { useColorScheme } from 'react-native';
+ 
+diff -ru src/components/animated-icon.tsx src/components/animated-icon.tsx
+--- a/src/components/animated-icon.tsx	2026-08-20 16:04:46.334913000 +0900
++++ b/src/components/animated-icon.tsx	2026-08-20 17:26:08.747179500 +0900
+@@ -139,7 +139,7 @@
+     position: 'absolute',
+   },
+   splashOverlay: {
+-    ...StyleSheet.absoluteFill,
++    ...StyleSheet.absoluteFillObject,
+     backgroundColor: '#208AEF',
+     alignItems: 'center',
+     justifyContent: 'center',
+diff -ru src/components/app-tabs.tsx src/components/app-tabs.tsx
+--- a/src/components/app-tabs.tsx	2026-08-20 16:04:46.334913000 +0900
++++ b/src/components/app-tabs.tsx	2026-08-20 17:27:00.302772700 +0900
+@@ -1,5 +1,6 @@
+-import { NativeTabs } from 'expo-router/unstable-native-tabs';
+-import { useColorScheme } from 'react-native';
++import MaterialIcons from '@expo/vector-icons/MaterialIcons';
++import { Icon, Label, NativeTabs, VectorIcon } from 'expo-router/unstable-native-tabs';
++import { Platform, useColorScheme } from 'react-native';
+ 
+ import { Colors } from '@/constants/theme';
+ 
+@@ -28,7 +29,7 @@
+  */
+ export default function AppTabs() {
+   const scheme = useColorScheme();
+-  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
++  const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
+ 
+   return (
+     <NativeTabs
+@@ -40,18 +41,30 @@
+         selected: { color: colors.brand },
+       }}>
+       <NativeTabs.Trigger name="record">
+-        <NativeTabs.Trigger.Label>기록</NativeTabs.Trigger.Label>
+-        <NativeTabs.Trigger.Icon sf="camera" md="photo_camera" />
++        <Label>기록</Label>
++        <Icon
++          {...(Platform.OS === 'ios'
++            ? { sf: 'camera' as const }
++            : { src: <VectorIcon family={MaterialIcons} name="photo-camera" /> })}
++        />
+       </NativeTabs.Trigger>
+ 
+       <NativeTabs.Trigger name="index">
+-        <NativeTabs.Trigger.Label>홈</NativeTabs.Trigger.Label>
+-        <NativeTabs.Trigger.Icon sf="house" md="home" />
++        <Label>홈</Label>
++        <Icon
++          {...(Platform.OS === 'ios'
++            ? { sf: 'house' as const }
++            : { src: <VectorIcon family={MaterialIcons} name="home" /> })}
++        />
+       </NativeTabs.Trigger>
+ 
+       <NativeTabs.Trigger name="table">
+-        <NativeTabs.Trigger.Label>나의 식탁</NativeTabs.Trigger.Label>
+-        <NativeTabs.Trigger.Icon sf="fork.knife" md="room_service" />
++        <Label>나의 식탁</Label>
++        <Icon
++          {...(Platform.OS === 'ios'
++            ? { sf: 'fork.knife' as const }
++            : { src: <VectorIcon family={MaterialIcons} name="room-service" /> })}
++        />
+       </NativeTabs.Trigger>
+     </NativeTabs>
+   );
+diff -ru src/components/app-tabs.web.tsx src/components/app-tabs.web.tsx
+--- a/src/components/app-tabs.web.tsx	2026-08-20 16:04:46.334913000 +0900
++++ b/src/components/app-tabs.web.tsx	2026-08-20 17:26:08.754087500 +0900
+@@ -103,7 +103,7 @@
+         {name === 'record' ? <CameraIcon size={24} color={color} /> : null}
+         {name === 'home' ? (
+           <SymbolView
+-            name={{ ios: 'house', android: 'home', web: 'home' }}
++            name={'house' as never}
+             type="monochrome"
+             weight="light"
+             size={24}
+Only in src/components/ui: collapsible.tsx
+diff -ru src/hooks/use-theme.ts src/hooks/use-theme.ts
+--- a/src/hooks/use-theme.ts	2026-08-20 16:04:46.391866200 +0900
++++ b/src/hooks/use-theme.ts	2026-08-20 17:26:08.753693200 +0900
+@@ -8,7 +8,7 @@
+ 
+ export function useTheme() {
+   const scheme = useColorScheme();
+-  const theme = scheme === 'unspecified' ? 'light' : scheme;
++  const theme = scheme === 'dark' ? 'dark' : 'light';
+ 
+   return Colors[theme];
+ }

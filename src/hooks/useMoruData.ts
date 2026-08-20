@@ -3,7 +3,11 @@
  *
  * 아직 상태관리 라이브러리를 추가하지 않는다.
  * 모듈 스코프의 작은 스토어 + React 내장 useSyncExternalStore 만 사용해서
- * 화면 사이에 온보딩 선택값과 mock 데이터를 공유할 수 있는 최소 구조만 만든다.
+ * 화면 사이에 온보딩 선택값을 공유할 수 있는 최소 구조만 만든다.
+ *
+ * ★ 기록(식사·증상)은 로컬에 쌓지 않는다. 서버가 원본이다.
+ *   전에는 저장할 때마다 로컬 배열에도 append 했는데, 초기값이 mock 이라
+ *   기록한 적 없는 항목이 "최근 기록" 에 섞여 보였다.
  *
  * 데이터는 services/api.ts 를 통해서만 가져온다.
  * 나중에 Zustand/Jotai 등으로 옮기더라도 화면 쪽 코드는 useMoruData() 그대로 두면 된다.
@@ -12,7 +16,7 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
 import * as api from '@/services/api';
-import type { FoodRecord } from '@/types/food';
+import type { RecordsResponse } from '@/types/record';
 import {
   ALLERGY_OPTIONS,
   AVOIDED_FOOD_OPTIONS,
@@ -21,7 +25,7 @@ import {
   type OnboardingData,
   type SymptomFrequency,
 } from '@/types/onboarding';
-import { SYMPTOM_TYPE_OPTIONS, type SymptomRecord } from '@/types/symptom';
+import { SYMPTOM_TYPE_OPTIONS } from '@/types/symptom';
 
 /** 로컬 3단계 빈도 → 서버 6단계 enum. 각 옵션의 실제 안내 문구(한 달에 1~2번 등) 기준으로 매핑한다 */
 const FREQUENCY_TO_API: Record<SymptomFrequency, BaselineFrequency> = {
@@ -33,16 +37,15 @@ const FREQUENCY_TO_API: Record<SymptomFrequency, BaselineFrequency> = {
 export type MoruState = {
   /** 온보딩 중 사용자가 고른 값 (로컬 상태) */
   onboarding: OnboardingData;
-  foodRecords: FoodRecord[];
-  symptomRecords: SymptomRecord[];
+  /** GET /records 응답. 서버가 원본이고 로컬에서 만들지 않는다 */
+  records: RecordsResponse;
   /** api 로부터 최초 데이터를 받아왔는지 */
   loaded: boolean;
 };
 
 const initialState: MoruState = {
   onboarding: EMPTY_ONBOARDING_DATA,
-  foodRecords: [],
-  symptomRecords: [],
+  records: { days: 14, meals: [], symptoms: [] },
   loaded: false,
 };
 
@@ -75,15 +78,14 @@ let loadPromise: Promise<void> | null = null;
 function loadOnce(): Promise<void> {
   if (loadPromise) return loadPromise;
 
-  loadPromise = Promise.all([api.getFoodRecords(), api.getSymptomRecords()]).then(
-    ([foodRecords, symptomRecords]) => {
-      setState({
-        foodRecords,
-        symptomRecords,
-        loaded: true,
-      });
-    },
-  );
+  loadPromise = api
+    .getRecords()
+    .then((records) => setState({ records, loaded: true }))
+    .catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('[records] GET /records failed:', err);
+      setState({ loaded: true });
+    });
 
   return loadPromise;
 }
@@ -144,14 +146,17 @@ export function useMoruData() {
     });
   }, []);
 
-  const addSymptomRecord = useCallback(async (record: SymptomRecord) => {
-    const saved = await api.createSymptomRecord(record);
-    setState({ symptomRecords: [saved, ...state.symptomRecords] });
-  }, []);
-
-  /** D2에서 POST /meals 성공 직후 호출 — 최근 기록(기록 탭) 표시용으로 로컬에도 남겨둔다 */
-  const addFoodRecord = useCallback((record: FoodRecord) => {
-    setState({ foodRecords: [record, ...state.foodRecords] });
+  /**
+   * 저장이 끝난 뒤 목록을 다시 받아온다.
+   * 로컬에 append 하지 않는 이유는 파일 상단 주석 참고.
+   */
+  const refreshRecords = useCallback(async () => {
+    try {
+      setState({ records: await api.getRecords() });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[records] refresh failed:', err);
+    }
   }, []);
 
   return {
@@ -159,7 +164,6 @@ export function useMoruData() {
     updateOnboarding,
     resetOnboarding,
     completeOnboarding,
-    addSymptomRecord,
-    addFoodRecord,
+    refreshRecords,
   };
 }

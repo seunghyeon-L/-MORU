@@ -52,40 +52,35 @@ export default function RecordScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
-  const { foodRecords, symptomRecords } = useMoruData();
+  const { records } = useMoruData();
   const [foodSheetVisible, setFoodSheetVisible] = useState(false);
 
-  const recentFoodItems: RecentItem[] = foodRecords.map((record) => ({
-    id: record.id,
-    time: new Date(record.eatenAt).getTime(),
-    day: formatDay(record.eatenAt),
-    clock: formatTime(record.eatenAt),
-    title: `${record.food.name} · ${PORTION_OPTIONS.find((o) => o.id === record.portion)?.label ?? ''}`,
+  // 제목·부제는 서버가 만들어 보낸 문구를 그대로 쓴다.
+  // 화면마다 조립하면 "반 그릇 · 국물까지" 같은 표기가 갈린다.
+  const recentFoodItems: RecentItem[] = records.meals.map((m) => ({
+    id: `meal-${m.id}`,
+    time: new Date(m.eaten_at).getTime(),
+    day: formatDay(m.eaten_at),
+    clock: formatTime(m.eaten_at),
+    title: `${m.food_name} · ${m.summary}`,
     badge: '음식',
   }));
 
-  const recentSymptomItems: RecentItem[] = symptomRecords.map((record) => {
-    const title = record.detail
-      ? `${SYMPTOM_TYPE_OPTIONS.find((o) => o.id === record.detail!.symptoms[0])?.label ?? '증상'} · ${severityLabel(record.detail.severity)}`
-      : (OVERALL_STATE_OPTIONS.find((o) => o.id === record.state)?.label ?? '기록');
-    return {
-      id: record.id,
-      time: new Date(record.recordedAt).getTime(),
-      day: formatDay(record.recordedAt),
-      clock: formatTime(record.recordedAt),
-      title,
-      badge: '증상',
-    };
-  });
+  const recentSymptomItems: RecentItem[] = records.symptoms.map((s) => ({
+    id: `symptom-${s.id}`,
+    time: new Date(s.onset_at).getTime(),
+    day: formatDay(s.onset_at),
+    clock: formatTime(s.onset_at),
+    title: s.summary,
+    badge: '증상',
+  }));
 
   const recentItems = [...recentFoodItems, ...recentSymptomItems]
     .sort((a, b) => b.time - a.time)
     .slice(0, 2);
 
-  const todaySymptomRecord = symptomRecords.find((record) => formatDay(record.recordedAt) === '오늘');
-  const todayStateLabel = todaySymptomRecord
-    ? OVERALL_STATE_OPTIONS.find((o) => o.id === todaySymptomRecord.state)?.label
-    : undefined;
+  const todaySymptom = records.symptoms.find((s) => formatDay(s.onset_at) === '오늘');
+  const todayStateLabel = todaySymptom ? todaySymptom.summary : undefined;
 
   return (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
