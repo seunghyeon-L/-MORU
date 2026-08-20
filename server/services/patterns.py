@@ -56,25 +56,58 @@ CONTEXT_KO = {
 #  재료별 동시발생 세기
 # ══════════════════════════════════════════════
 
-def _symptom_hit(db: Session, user_id: int, meal: Meal, axis: str) -> SymptomLog | None:
-    """이 식사 뒤 그 축의 작용 구간 안에 남겨진 증상 기록.
+def _dominant_axis(db: Session, meal: Meal) -> str | None:
+    rows = db.query(MealFodmap).filter(MealFodmap.meal_id == meal.id).all()
+    if not rows:
+        return None
+    return max(rows, key=lambda r: float(r.grams)).axis
 
-    "먹고 2~8시간" 같은 사각형 창이 아니라 감쇠 곡선을 쓴다.
-    곡선 밖(weight 0)이면 그 증상은 이 식사와 무관하다고 본다.
+
+def assign_symptoms(db: Session, user_id: int, meals: list[Meal]) -> dict[int, int]:
+    """증상 1건을 **식사 한 끼에만** 붙인다.  {meal_id: symptom_log_id}
+
+    ★ 왜 필요한가
+      전에는 식사마다 따로 "내 창 안에 증상이 있나" 를 물었다.
+      그러면 하루 세 끼를 먹고 배가 **한 번** 아팠을 때
+      세 끼 모두가 그 증상을 자기 것으로 세서 "3번 중 3번" 이 됐다.
+      단일 사건이 3회 재현으로 둔갑한다. 2-of-3 판정의 전제가 무너진다.
+
+      그래서 증상 하나는 **그 시각에 감쇠 곡선 가중치가 가장 큰 한 끼**에만 붙인다.
+      가중치가 가장 크다는 건 그 시점에 장에서 가장 세게 작용하고 있었다는 뜻이다.
+      동점이면 더 최근 식사에 붙인다 (더 가까운 쪽이 설명력이 크다).
     """
-    t0, _, _, t3 = fodmap.CURVE[axis]
-    lo = meal.eaten_at + timedelta(hours=t0)
-    hi = meal.eaten_at + timedelta(hours=t3)
-    # ★ "오늘은 괜찮았어요" 기록(강도만 남기고 증상은 없음)은 세지 않는다.
-    #   E0 강도 체크에서 낮게 고르면 그 자리에서 기록이 끝나는데,
-    #   그걸 불편함으로 세면 멀쩡한 날이 반응으로 잡힌다.
-    #   실제로 불편함이 있었다고 표시된 것만 본다.
-    return (db.query(SymptomLog)
+    if not meals:
+        return {}
+
+    axis_of = {m.id: _dominant_axis(db, m) for m in meals}
+    span = [m for m in meals if axis_of.get(m.id)]
+    if not span:
+        return {}
+
+    lo = min(m.eaten_at for m in span)
+    hi = max(m.eaten_at for m in span) + timedelta(hours=16)
+
+    logs = (db.query(SymptomLog)
             .join(SymptomDetail, SymptomDetail.symptom_log_id == SymptomLog.id)
             .filter(SymptomLog.user_id == user_id,
                     SymptomLog.onset_at >= lo, SymptomLog.onset_at <= hi,
                     SymptomDetail.level.in_(("mild", "strong")))
-            .order_by(SymptomLog.onset_at).first())
+            .distinct().all())
+
+    out: dict[int, int] = {}
+    for log in logs:
+        best, best_w = None, 0.0
+        for m in span:
+            hours = (log.onset_at - m.eaten_at).total_seconds() / 3600.0
+            if hours <= 0:
+                continue
+            wgt = fodmap.weight(axis_of[m.id], hours)
+            if wgt > best_w or (wgt == best_w and best is not None
+                                and wgt > 0 and m.eaten_at > best.eaten_at):
+                best, best_w = m, wgt
+        if best is not None and best_w > 0 and best.id not in out:
+            out[best.id] = log.id
+    return out
 
 
 MIN_SHARE = 0.35       # 그 식사에서 이 재료가 낸 기여 비율
@@ -98,6 +131,8 @@ def ingredient_stats(db: Session, user_id: int, days: int = LOOKBACK_DAYS) -> li
     meals = (db.query(Meal)
              .filter(Meal.user_id == user_id, Meal.eaten_at >= since).all())
 
+    assigned = assign_symptoms(db, user_id, meals)
+
     by_ing: dict[int, dict] = {}
     for meal in meals:
         per, est = fodmap.meal_breakdown(db, meal)
@@ -117,19 +152,26 @@ def ingredient_stats(db: Session, user_id: int, days: int = LOOKBACK_DAYS) -> li
             d = by_ing.setdefault(ing_id, {
                 "ingredient_id": ing_id, "name": ing.name if ing else "?",
                 "axis": axis, "meals": 0, "hits": 0,
-                "estimated": 0.0, "share": 0.0, "hit_logs": [],
+                "estimated": 0.0, "share": 0.0,
+                "_num": 0.0, "_den": 0.0, "hit_logs": [],
             })
             d["meals"] += 1
             d["estimated"] = max(d["estimated"], est)
-            d["share"] = max(d["share"], share)
+            # ★ share 를 식사별 최댓값으로 잡으면, 어쩌다 한 번 기여가 높았던
+            #   미량 재료가 진짜 부하를 밀어내고 지목된다.
+            #   전체 기간의 실제 누적 기여로 계산한다.
+            d["_num"] += axes[axis]
+            d["_den"] += totals.get(axis, 0.0)
 
-            log = _symptom_hit(db, user_id, meal, axis)
-            if log is not None:
+            log_id = assigned.get(meal.id)
+            if log_id is not None:
                 d["hits"] += 1
-                d["hit_logs"].append(log.id)
+                d["hit_logs"].append(log_id)
 
     out = []
     for d in by_ing.values():
+        d["share"] = d["_num"] / d["_den"] if d["_den"] else 0.0
+        d.pop("_num", None); d.pop("_den", None)
         d["ratio"] = d["hits"] / d["meals"] if d["meals"] else 0.0
         d["speakable"] = (
             d["meals"] >= MIN_MEALS
@@ -159,6 +201,8 @@ def food_stats(db: Session, user_id: int, days: int = LOOKBACK_DAYS) -> list[dic
     meals = (db.query(Meal)
              .filter(Meal.user_id == user_id, Meal.eaten_at >= since).all())
 
+    assigned = assign_symptoms(db, user_id, meals)
+
     by_food: dict[str, dict] = {}
     for meal in meals:
         per, est = fodmap.meal_breakdown(db, meal)
@@ -181,10 +225,10 @@ def food_stats(db: Session, user_id: int, days: int = LOOKBACK_DAYS) -> list[dic
                 c = d["contributors"]
                 c[ing_id] = c.get(ing_id, 0.0) + axes[axis]
 
-        log = _symptom_hit(db, user_id, meal, axis)
-        if log is not None:
+        log_id = assigned.get(meal.id)
+        if log_id is not None:
             d["hits"] += 1
-            d["hit_logs"].append(log.id)
+            d["hit_logs"].append(log_id)
 
     out = []
     for d in by_food.values():
