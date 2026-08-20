@@ -172,16 +172,17 @@ export default function SafetyScreen() {
           <View style={styles.flex} />
         </View>
 
+        {/*
+          버튼은 하나다. 라벨이 지금 체크 상태를 그대로 말한다.
+
+          전에는 "해당하는 것이 없어요" 와 "하나라도 있어요" 두 개가
+          같은 함수를 부르고 있었다. 항목을 체크해두고도
+          "해당하는 것이 없어요" 를 누를 수 있어서, 버튼 글자가 화면과 어긋났다.
+        */}
         <BottomButton
-          label={data?.none_label ?? '해당하는 것이 없어요'}
+          label={selected.length > 0 ? '다음' : (data?.none_label ?? '해당하는 것이 없어요')}
           disabled={submitting}
           onPress={handleContinue}
-          secondary={{
-            label: '하나라도 있어요',
-            variant: 'secondary',
-            disabled: submitting,
-            onPress: handleContinue,
-          }}
         />
       </ThemedView>
     </ScrollView>

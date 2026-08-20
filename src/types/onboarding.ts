@@ -70,6 +70,9 @@ export type CeliacDiagnosis = (typeof CELIAC_DIAGNOSIS_OPTIONS)[number]['id'];
 /* ------------------------------------------------------------------ */
 
 export const AVOIDED_FOOD_OPTIONS = [
+  // '없음' 은 맨 앞. 나머지와 함께 고를 수 없는 항목이라
+  // 목록 중간에 있으면 못 보고 지나치거나 같이 눌러버린다.
+  { id: 'none', label: '없음' },
   { id: 'dairy', label: '우유 / 유제품' },
   { id: 'wheat', label: '밀 / 빵' },
   { id: 'onion', label: '양파' },
@@ -79,7 +82,6 @@ export const AVOIDED_FOOD_OPTIONS = [
   { id: 'coffee', label: '커피' },
   { id: 'alcohol', label: '술' },
   { id: 'carbonated', label: '탄산' },
-  { id: 'none', label: '없음' },
   { id: 'bread-snack', label: '빵·과자' },
   { id: 'cereal', label: '시리얼' },
   { id: 'apple-pear', label: '사과·배' },

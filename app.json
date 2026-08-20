@@ -8,7 +8,12 @@
     "scheme": "moru",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.anonymous.moru",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -40,7 +45,8 @@
       [
         "expo-image-picker",
         {
-          "cameraPermission": "음식/원재료표 사진을 촬영하려면 카메라 접근 권한이 필요해요."
+          "cameraPermission": "음식/원재료표 사진을 촬영하려면 카메라 접근 권한이 필요해요.",
+          "photosPermission": "앨범에서 음식/원재료표 사진을 고르려면 사진 접근 권한이 필요해요."
         }
       ]
     ],

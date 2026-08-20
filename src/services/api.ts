@@ -9,8 +9,6 @@
  * 모든 함수는 Promise 를 반환한다.
  */
 
-import { mockFoodRecords } from '@/mock/foods';
-import { mockSymptomRecords } from '@/mock/symptoms';
 import type { PatternsResponse } from '@/types/analysis';
 import type {
   ChatSendRequest,
@@ -29,6 +27,7 @@ import type {
   SubstitutionsResponse,
 } from '@/types/food';
 import type { HomeResponse, SnoozeResponse } from '@/types/home';
+import type { RecordsResponse } from '@/types/record';
 import type { ProfileRequest, ProfileResponse } from '@/types/onboarding';
 import type {
   ChallengeAttemptRequest,
@@ -41,7 +40,7 @@ import type {
   ChallengeSuggestion,
   IngredientContains,
 } from '@/types/reintroduction';
-import type { SymptomLogRequest, SymptomLogResponse, SymptomRecord } from '@/types/symptom';
+import type { SymptomLogRequest, SymptomLogResponse } from '@/types/symptom';
 import type { MeResponse } from '@/types/user';
 
 import { apiRequest } from './apiClient';
@@ -72,8 +71,14 @@ export function getMe(): Promise<MeResponse> {
 /* 음식                                                                 */
 /* ------------------------------------------------------------------ */
 
-export function getFoodRecords(): Promise<FoodRecord[]> {
-  return ok(mockFoodRecords);
+/**
+ * 기록 메인이 쓰는 목록. GET /records
+ *
+ * 문구(summary·detail)는 서버가 만들어 보낸다.
+ * "반 그릇 · 국물까지" 같은 문장을 화면마다 조립하면 표기가 갈린다.
+ */
+export function getRecords(days = 14): Promise<RecordsResponse> {
+  return apiRequest<RecordsResponse>(`/records?days=${days}`);
 }
 
 /** D1 텍스트 입력(메뉴 검색/직접 입력) → 재료 식별 */
@@ -141,14 +146,7 @@ export function sendChatMessage(payload: ChatSendRequest): Promise<ChatSendRespo
 /* 증상                                                                 */
 /* ------------------------------------------------------------------ */
 
-export function getSymptomRecords(): Promise<SymptomRecord[]> {
-  return ok(mockSymptomRecords);
-}
 
-export function createSymptomRecord(record: SymptomRecord): Promise<SymptomRecord> {
-  // TODO: POST /symptom-records (로컬 "최근 기록" 표시용 — 실제 저장은 logSymptom 이 한다)
-  return ok(record);
-}
 
 /** E0·E1·E2 를 한 번에 저장한다. red_flag 가 true 면 notice 를 symptom/medical.tsx 로 전달한다 */
 export function logSymptom(payload: SymptomLogRequest): Promise<SymptomLogResponse> {

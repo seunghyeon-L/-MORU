@@ -60,7 +60,7 @@ export default function FoodResultScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
-  const { addFoodRecord } = useMoruData();
+  const { refreshRecords } = useMoruData();
   // photoUri: 카메라(D1)에서 촬영한 사진, foodName/mode: H1(메뉴 검색/직접 입력)에서 전달
   // food_id: H1 suggestion(screen="D2")에서 이미 확인된 food_id 를 전달받았을 때만 온다
   const { photoUri, foodName, mode, food_id } = useLocalSearchParams<{
@@ -160,18 +160,7 @@ export default function FoodResultScreen() {
         .map((id) => allIngredients.find((ingredient) => ingredient.id === id))
         .filter((ingredient): ingredient is Ingredient => Boolean(ingredient));
 
-      // 최근 기록(기록 탭) 표시용 — 서버 저장과 별개로 로컬에도 남겨둔다
-      addFoodRecord({
-        id: `food-${result.meal_id}`,
-        food: {
-          id: resolvedFoodId ? String(resolvedFoodId) : `food-${result.meal_id}`,
-          name: identify.food_name,
-          ingredients: selectedIngredients,
-        },
-        eatenAt,
-        inputMethod: METHOD_TO_INPUT_METHOD[method],
-        portion: portion ?? DEFAULT_PORTION,
-      });
+      void refreshRecords();   // 저장이 끝났으니 목록을 다시 받아온다
 
       const ingredientNames = selectedIngredients.map((ingredient) => ingredient.name).join(',');
 

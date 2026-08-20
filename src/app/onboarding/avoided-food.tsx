@@ -24,7 +24,16 @@ export default function AvoidedFoodScreen() {
 
   const toggle = (id: AvoidedFood) => {
     setSelected((prev) => {
-      const next = prev.includes(id) ? prev.filter((food) => food !== id) : [...prev, id];
+      // '없음' 은 나머지와 함께 고를 수 없다.
+      // '없음' 을 누르면 나머지가 풀리고, 다른 걸 누르면 '없음' 이 풀린다.
+      // (allergy 화면이 쓰는 방식과 같다)
+      let next: AvoidedFood[];
+      if (id === 'none') {
+        next = prev.includes('none') ? [] : ['none'];
+      } else {
+        next = prev.includes(id) ? prev.filter((food) => food !== id) : [...prev, id];
+        next = next.filter((food) => food !== 'none');
+      }
       if (!next.includes('etc')) setEtcText('');
       return next;
     });
