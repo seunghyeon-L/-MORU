@@ -53,11 +53,20 @@ const STATIC_PROMPTS: StaticPrompt[] = [
  * 계약에 없어 화면은 항상 빈 대화로 시작한다. session_id 를 들고 있다가 다음 전송에
  * 그대로 실어 보내면 서버가 같은 대화로 이어준다.
  *
- * D1 바텀시트(메뉴 검색/직접 입력, mode=search|manual)로 들어온 "음식 기록용" 대화에서만
- * suggestions(screen="D2"|"H4") 탭이 화면 이동을 일으킨다 — 서버가 준 food_id/food_name 을
- * 그대로 다음 화면에 전달하며, 답변 텍스트에서 음식 이름을 추출해 food_id 를 만들지 않는다.
- * 바텀시트를 거치지 않은 일반 "AI와 대화하기"는 대체 레시피/성분 대체/개인화 추천을 대화로만
- * 응답하는 기능이라, 뒤로가기를 누르기 전까지 어떤 이유로도 화면을 벗어나지 않는다.
+ * suggestions(screen="D2"|"H4")는 서버가 준 food_id/food_name 을 그대로 다음 화면에 전달하며,
+ * 답변 텍스트에서 음식 이름을 추출해 food_id 를 만들지 않는다.
+ * - screen="D2"(음식 기록 흐름)는 D1 바텀시트(메뉴 검색/직접 입력, mode=search|manual)로 들어온
+ *   대화에서만 탭으로 이동한다 — 일반 "AI와 대화하기"에서 음식 기록 화면으로 강제 이동시키지 않는다.
+ * - screen="H4"(대체안 허브)는 진입 방식과 무관하게 탭하면 이동한다.
+ *
+ * targetFood: 이 세션 중 서버가 처음으로 food_id 를 확정해서 준 음식을 고정해서 기억한다.
+ * "대체 레시피"/"성분 조절 제안"/"나에게 맞는 선택" 하단 카드는 targetFood 가 이미 있으면
+ * AI에게 다시 묻지 않고 그 food_id 로 곧장 H4(대체안 허브)로 이동한다 — H4 는 이미
+ * GET /foods/{food_id}/alternatives 로 대체 성분(H3)/대체 메뉴(H5)/대체 레시피(H3→H2)까지
+ * 실제 API로 뻗어나가는 화면이라, 하단 3개 카드를 각각 다른 화면으로 억지로 분기시키지 않고
+ * 이미 검증된 이 허브로 보낸다. targetFood 가 아직 없으면(대화에서 음식이 확정되기 전) 기존처럼
+ * 카드 문구를 채팅으로 보내고, 그 응답에 food_id 가 실려 오면 그때 targetFood 로 고정된다.
+ * 한번 고정된 targetFood 는 이후 대화에서 다른 음식이 언급돼도 바뀌지 않는다.
  * blocked:true 면 suggestions 가 오지 않으므로 별도 분기 없이 자연히 아무것도 뜨지 않는다.
  */
 export default function FoodChatScreen() {
@@ -74,6 +83,8 @@ export default function FoodChatScreen() {
   const [suggestions, setSuggestions] = useState<ChatSuggestion[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  /** 이 대화 세션에서 서버가 처음 확정해준 food_id — 한번 정해지면 바뀌지 않는다 */
+  const [targetFood, setTargetFood] = useState<{ food_id: number; food_name?: string }>();
 
   /**
    * fromInput 은 사용자가 입력창에 직접 타이핑해서 보낸 메시지일 때만 true 로 넘긴다.
@@ -123,6 +134,15 @@ export default function FoodChatScreen() {
         return;
       }
 
+      // 이 세션에서 처음으로 food_id 가 확정되면 targetFood 로 고정한다 — 이후 다른 음식이
+      // 언급돼도 덮어쓰지 않는다(Test 4: 기준 음식은 최초 확정된 값에서 바뀌지 않아야 함).
+      if (!targetFood) {
+        const withFood = response.suggestions.find((suggestion) => suggestion.food_id !== undefined);
+        if (withFood?.food_id !== undefined) {
+          setTargetFood({ food_id: withFood.food_id, food_name: withFood.food_name });
+        }
+      }
+
       setSuggestions(response.suggestions);
     } catch (err) {
       // eslint-disable-next-line no-console
@@ -132,14 +152,23 @@ export default function FoodChatScreen() {
     }
   };
 
+  /** D2 는 음식 기록 흐름 전용이라 D1 바텀시트로 들어온 대화(isFoodEntry)에서만 이동을 허용한다 */
+  const isSuggestionNavigable = (suggestion: ChatSuggestion) =>
+    (isFoodEntry && suggestion.screen === 'D2' && suggestion.food_id !== undefined) ||
+    (suggestion.screen === 'H4' && (targetFood?.food_id ?? suggestion.food_id) !== undefined);
+
   const handleSuggestionPress = (suggestion: ChatSuggestion) => {
-    if (suggestion.screen === 'D2' && suggestion.food_id !== undefined) {
+    if (isFoodEntry && suggestion.screen === 'D2' && suggestion.food_id !== undefined) {
       router.push({
         pathname: '/food/result',
         params: { food_id: String(suggestion.food_id), foodName: suggestion.food_name, mode },
       });
-    } else if (suggestion.screen === 'H4' && suggestion.food_id !== undefined) {
-      router.push({ pathname: '/food/alternative', params: { food_id: String(suggestion.food_id) } });
+    } else if (suggestion.screen === 'H4') {
+      // targetFood 가 이미 고정돼 있으면 이 대화 세션 전체에서 그 food_id 를 우선한다
+      const foodId = targetFood?.food_id ?? suggestion.food_id;
+      if (foodId !== undefined) {
+        router.push({ pathname: '/food/alternative', params: { food_id: String(foodId) } });
+      }
     }
   };
 
@@ -170,9 +199,7 @@ export default function FoodChatScreen() {
                 <SelectionCard
                   key={`${suggestion.screen}-${index}`}
                   title={suggestion.label}
-                  // 바텀시트(메뉴 검색/직접 입력)로 들어온 기록용 대화에서만 탭으로 화면 이동한다.
-                  // 일반 "AI와 대화하기"는 뒤로가기 전까지 대화창에 머물러야 해서 탭해도 이동하지 않는다.
-                  onPress={isFoodEntry ? () => handleSuggestionPress(suggestion) : undefined}
+                  onPress={isSuggestionNavigable(suggestion) ? () => handleSuggestionPress(suggestion) : undefined}
                 />
               ))}
             </View>
@@ -188,7 +215,16 @@ export default function FoodChatScreen() {
                 key={prompt.id}
                 title={prompt.title}
                 description={prompt.description}
-                onPress={() => send(prompt.title)}
+                // targetFood 가 이미 확정돼 있으면 AI에게 다시 묻지 않고 곧장 그 음식의 H4로 이동한다.
+                // 아직 없으면 기존처럼 카드 문구를 채팅으로 보내 AI가 음식을 확정하게 한다.
+                onPress={() =>
+                  targetFood
+                    ? router.push({
+                        pathname: '/food/alternative',
+                        params: { food_id: String(targetFood.food_id) },
+                      })
+                    : send(prompt.title)
+                }
                 accessory={
                   <ThemedView type={prompt.iconBg} style={styles.suggestionIcon}>
                     <prompt.Icon
