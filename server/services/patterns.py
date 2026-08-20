@@ -176,9 +176,20 @@ def food_stats(db: Session, user_id: int, days: int = LOOKBACK_DAYS) -> list[dic
     out = []
     for d in by_food.values():
         d["ratio"] = d["hits"] / d["meals"] if d["meals"] else 0.0
+        # ★ 음식 단위 관찰에는 estimated 조건을 걸지 않는다.
+        #
+        #   estimated 는 "그램을 카테고리 평균으로 때운 비율" 이다.
+        #   그런데 "이 음식을 N번 먹고 M번 불편했다" 는 그램과 무관하다.
+        #   먹었는지 안 먹었는지는 사용자가 직접 확정한 사실이다.
+        #
+        #   여기에 estimated 를 걸었더니 **마스터에 없는 음식을 먹는 사람은
+        #   아무리 강한 패턴이 있어도 영원히 아무것도 못 봤다.**
+        #   집밥 10번 중 7번 불편해도 침묵했다. 한국에서 이건 대부분의 사용자다.
+        #
+        #   그램 정확도가 필요한 건 재료를 **지목**할 때다.
+        #   그건 ingredient_stats 쪽에서 계속 막는다.
         d["speakable"] = (d["meals"] >= MIN_MEALS and d["hits"] >= MIN_HITS
-                          and d["ratio"] >= MIN_RATIO
-                          and d["estimated"] <= MAX_ESTIMATED)
+                          and d["ratio"] >= MIN_RATIO)
         out.append(d)
     return sorted(out, key=lambda x: (not x["speakable"], -x["ratio"], -x["meals"]))
 

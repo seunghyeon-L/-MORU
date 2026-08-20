@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from models import Ingredient, MyTableItem, UserAllergy
+from models import Ingredient, MyTableItem, SavedRecommendation, UserAllergy
 
 SECTION_TITLES = [
     ("safe", "안심하고 먹는 음식"),
@@ -99,8 +99,36 @@ def view(db: Session, user_id: int) -> dict:
         "sub": (f"피하던 음식 {total}가지 중 {recovered}가지를 다시 드실 수 있게 됐어요."
                 if recovered else "하나씩 천천히 넓혀가요."),
         "sections": sections,
-        "saved_recommendations": [],   # TODO(B-6)
+        "saved_recommendations": _saved(db, user_id),
     }
+
+
+def _saved(db: Session, user_id: int) -> list[dict]:
+    """G "저장한 추천". POST /saved 로 저장한 것들.
+
+    저장은 되는데 조회가 비어 있어서 사용자에게는 저장이 안 되는 것처럼 보였다.
+    """
+    from models import MenuAlternative, Recipe, Substitution
+
+    out = []
+    for s in (db.query(SavedRecommendation)
+              .filter(SavedRecommendation.user_id == user_id)
+              .order_by(SavedRecommendation.saved_at.desc())):
+        title = None
+        if s.kind == "recipe":
+            r = db.get(Recipe, s.ref_id)
+            title = r.title if r else None
+        elif s.kind == "menu":
+            m = db.get(MenuAlternative, s.ref_id)
+            title = m.alt_name if m else None
+        elif s.kind == "substitution":
+            sub = db.get(Substitution, s.ref_id)
+            title = sub.replacement if sub else None
+        if title:   # 지워진 마스터를 가리키는 건 조용히 뺀다
+            out.append({"kind": s.kind, "ref_id": s.ref_id, "title": title,
+                        "screen": {"recipe": "H2", "substitution": "H3",
+                                   "menu": "H5"}[s.kind]})
+    return out
 
 
 def touch(item: MyTableItem) -> None:

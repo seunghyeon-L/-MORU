@@ -209,15 +209,35 @@ def build_context(db: Session, user: User) -> str:
            .filter(Challenge.user_id == user.id, Challenge.status == "done").all())
 
     lines = []
-    NAMES = {"safe": "안심하고 먹는 음식", "candidate": "확인된 후보",
-             "to_try": "다시 먹어볼 음식", "avoiding": "피하는 음식"}
+    # ★ 라벨을 사람 말 그대로 쓰면 LLM 이 시제를 오해한다.
+    #   "다시 먹어볼 음식: 양파" 를 주면 "양파를 다시 먹어보셨다" 고 답한다.
+    #   아직 안 해본 것인데 해봤다고 말하는 건 사실 오류다.
+    NAMES = {"safe": "확인 끝났고 편하게 먹는 음식",
+             "candidate": "확인해봤더니 반응이 있었던 음식",
+             "to_try": "아직 확인 안 한 음식 (지금 피하는 중)",
+             "avoiding": "사용자가 시도하지 않기로 한 음식"}
     for k, label in NAMES.items():
         if by.get(k):
             lines.append(f"- {label}: {', '.join(by[k])}")
     for c in chs:
         lines.append(f"- 확인 완료: {challenges.ingredient_name(db, c.ingredient_id)} "
                      f"결과 {c.result_grade}")
-    # TODO(A-4): 식사·증상 기록 요약을 여기 붙인다. B-3/B-5 가 채워지면.
+    # 최근 식사 — 이름과 날짜만. 여기 없는 음식을 LLM 이 말하면 안 된다.
+    now = datetime.now(timezone.utc)
+    meals = (db.query(Meal)
+             .filter(Meal.user_id == user.id, Meal.eaten_at >= now - timedelta(days=7))
+             .order_by(Meal.eaten_at.desc()).limit(10).all())
+    if meals:
+        eaten = ", ".join(
+            f"{m.food_name}({m.eaten_at.astimezone(KST).strftime('%m/%d')})" for m in meals)
+        lines.append(f"- 최근 일주일 실제로 먹은 것: {eaten}")
+
+    # 관찰 — 말해도 되는 것만. patterns 가 근거 부족한 건 이미 걸러준다.
+    for s in patterns.ingredient_stats(db, user.id):
+        if s["speakable"]:
+            lines.append(f"- 관찰: {s['name']}이 든 식사 {s['meals']}번 중 "
+                         f"{s['hits']}번 뒤에 불편함 기록 (인과는 확인되지 않음)")
+
     return "\n".join(lines) if lines else "(기록 없음)"
 
 
