@@ -35,7 +35,9 @@ class SafetyIn(BaseModel):
 
 
 class ProfileIn(BaseModel):
-    nickname: str
+    # 온보딩에 닉네임 입력 단계가 없다. 안 보내도 된다.
+    # 없으면 홈 인사가 "안녕하세요" 로만 나간다.
+    nickname: str | None = None
     allergies: list[str] = []
     celiac: Literal["yes", "no", "unknown"] = "unknown"
     avoided_foods: list[str] = []

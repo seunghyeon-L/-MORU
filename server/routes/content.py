@@ -61,9 +61,11 @@ async def contains(ingredient_id: int, dev: str = Depends(device_id), db: Sessio
             {"kind": "portion", "title": "양 조절", "detail": "1/2인 또는 고기 양을 줄여보세요."},
             {"kind": "omit", "title": "빼서 먹기", "detail": "마늘, 양파(양념)를 빼거나 줄여보세요."},
             {"kind": "substitute", "title": "대체 성분 제안",
-             "detail": "더 편안할 수 있는 재료로 바꿔보세요.", "screen": "H3"},
+             "detail": "더 편안할 수 있는 재료로 바꿔보세요.",
+             "screen": "H3", "ingredient_ids": [12, 15]},
             {"kind": "menu", "title": "대체 메뉴 제안",
-             "detail": "비슷한 맛의 다른 메뉴를 찾아드릴게요.", "screen": "H5"},
+             "detail": "비슷한 맛의 다른 메뉴를 찾아드릴게요.",
+             "screen": "H5", "food_id": 9},
         ],
     }),
 )
@@ -84,7 +86,7 @@ async def alternatives(food_id: int, dev: str = Depends(device_id), db: Session 
     # "빼서 먹기" 후보 — FODMAP 값이 있는(=6축 계산에 실제로 잡히는) 재료 위주로 최대 2개.
     # 어떤 게 증상 원인인지 판정하는 게 아니라, 그냥 계산에 잡히는 재료를 알려주는 것뿐이다.
     omit_rows = (
-        db.query(Ingredient.name)
+        db.query(Ingredient.id, Ingredient.name)
         .join(FoodIngredient, FoodIngredient.ingredient_id == Ingredient.id)
         .join(IngredientFodmap, IngredientFodmap.ingredient_id == Ingredient.id)
         .filter(FoodIngredient.food_id == food_id)
@@ -92,9 +94,19 @@ async def alternatives(food_id: int, dev: str = Depends(device_id), db: Session 
         .limit(2)
         .all()
     )
-    omit_names = [r[0] for r in omit_rows] or ["양념"]
+    omit_ids = [r[0] for r in omit_rows]
+    omit_names = [r[1] for r in omit_rows] or ["양념"]
     # 조사는 마지막 항목에만 — "고추장, 대파를" (O), "고추장을, 대파를" (X)
     omit_text = ", ".join(omit_names[:-1] + [w(omit_names[-1], "을")])
+
+    # H3 로 넘길 재료 — 이 음식에 들어가고 **치환안이 실제로 있는** 것만.
+    # 치환안 없는 id 를 넘기면 H3 가 빈 화면이 된다.
+    sub_ids = [r[0] for r in (
+        db.query(Substitution.ingredient_id)
+        .join(FoodIngredient,
+              FoodIngredient.ingredient_id == Substitution.ingredient_id)
+        .filter(FoodIngredient.food_id == food_id)
+        .distinct().all())]
 
     return {
         "food_name": food.name,
@@ -104,9 +116,12 @@ async def alternatives(food_id: int, dev: str = Depends(device_id), db: Session 
              "detail": f"1/2인 또는 {food.name} 양을 줄여보세요."},
             {"kind": "omit", "title": "빼서 먹기", "detail": f"{omit_text} 빼거나 줄여보세요."},
             {"kind": "substitute", "title": "대체 성분 제안",
-             "detail": "더 편안할 수 있는 재료로 바꿔보세요.", "screen": "H3"},
+             "detail": "더 편안할 수 있는 재료로 바꿔보세요.",
+             # H3 로 갈 때 그대로 넘기면 된다. 프론트가 id 를 만들 필요가 없다.
+             "screen": "H3", "ingredient_ids": sub_ids},
             {"kind": "menu", "title": "대체 메뉴 제안",
-             "detail": "비슷한 맛의 다른 메뉴를 찾아드릴게요.", "screen": "H5"},
+             "detail": "비슷한 맛의 다른 메뉴를 찾아드릴게요.",
+             "screen": "H5", "food_id": food_id},
         ],
     }
 
@@ -166,6 +181,7 @@ _SUBSTITUTION_TIPS = [
             {"seq": 1, "title": "양을 줄여서 시작하기", "detail": "소량으로 먼저 시도해보세요."},
             {"seq": 2, "title": "공복은 피하기", "detail": "식사 후 또는 간식과 함께 드세요."},
         ],
+        "recipes": [{"recipe_id": 1, "title": "속 편한 녹차라떼", "screen": "H2"}],
     }),
 )
 async def substitutions(
@@ -178,7 +194,8 @@ async def substitutions(
     except ValueError:
         ids = []
     if not ids:
-        return {"intro": "이렇게 바꿔보세요", "groups": [], "tips": _SUBSTITUTION_TIPS}
+        return {"intro": "이렇게 바꿔보세요", "groups": [],
+                "tips": _SUBSTITUTION_TIPS, "recipes": []}
 
     names = dict(
         db.query(Ingredient.id, Ingredient.name).filter(Ingredient.id.in_(ids)).all()
@@ -202,7 +219,17 @@ async def substitutions(
             "alt": row.alt_text,
         })
 
-    return {"intro": "이렇게 바꿔보세요", "groups": groups, "tips": _SUBSTITUTION_TIPS}
+    # H2 로 가는 유일한 진입점. 레시피는 재료 이름으로 느슨하게 잇는다
+    # (recipe_items 는 "우유 (또는 락토프리 우유)" 처럼 문장으로 적혀 있다).
+    recipes = []
+    for rid, title in db.query(Recipe.id, Recipe.title).all():
+        items = db.query(RecipeItem.name).filter(RecipeItem.recipe_id == rid).all()
+        blob = " ".join(n for (n,) in items)
+        if any(nm and nm in blob for nm in names.values()):
+            recipes.append({"recipe_id": rid, "title": title, "screen": "H2"})
+
+    return {"intro": "이렇게 바꿔보세요", "groups": groups,
+            "tips": _SUBSTITUTION_TIPS, "recipes": recipes}
 
 
 @router.get(

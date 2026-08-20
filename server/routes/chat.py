@@ -72,5 +72,7 @@ async def send(body: ChatIn, dev: str = Depends(device_id), db: Session = Depend
         "reply": r["reply"],
         "blocked": r["blocked"],
         "block_reason": r["block_reason"],
-        "suggestions": [],      # TODO(A-7): 음식 질문이면 H4 로 보내는 칩
+        # 말한 음식이 마스터에 있으면 D2(기록) · H4(대체안) 로 가는 칩이 실린다.
+        # 차단된 답변에는 칩이 없다.
+        "suggestions": r["suggestions"],
     }

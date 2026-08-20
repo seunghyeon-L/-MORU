@@ -90,7 +90,8 @@ async def screen(body: SafetyIn, dev: str = Depends(device_id), db: Session = De
 async def profile(body: ProfileIn, dev: str = Depends(device_id), db: Session = Depends(get_db)):
     """avoided_foods 는 그대로 나의 식탁의 avoiding 구획이 된다."""
     u = users.get_or_create(db, dev)
-    u.nickname = body.nickname
+    if body.nickname:          # 안 보내면 기존 값을 지우지 않는다
+        u.nickname = body.nickname
     u.celiac = body.celiac
     u.baseline_frequency = body.baseline_frequency
     u.onboarded_at = datetime.now(timezone.utc)

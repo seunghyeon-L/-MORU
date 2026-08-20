@@ -81,10 +81,12 @@ X-Device-Id: <앱이 최초 실행 시 생성해 기기에 저장한 UUID>
 
 ### `POST /onboarding/profile` — B2·B3·B4 한 번에
 
+**`nickname` 은 선택입니다.** 온보딩에 입력 단계가 없으므로 안 보내면 됩니다.
+안 보내면 홈 인사가 `"안녕하세요"` 로만 나갑니다.
+
 ```json
-// 요청
+// 요청 — nickname 없이 이대로 보내면 됩니다
 {
-  "nickname": "은솔",
   "allergies": ["우유","견과류"],
   "celiac": "no",                            // yes | no | unknown
   "avoided_foods": ["우유·유제품","밀·빵","양파","마늘","커피","탄산음료","사과","콩류"],
@@ -149,6 +151,32 @@ G 화면에는 "피하는 음식" 구획이 없습니다 — 3구획뿐이고, �
 | `schedule_note` | 권할 게 있고 진행 중인 게 없을 때 | 액션 없음 |
 
 `weekly_recap` 은 식사 기록이 쌓여야 나옵니다 (아직 미구현).
+
+### H2~H5 는 어떤 id 로 진입하나 ★
+
+**프론트가 id 를 만들거나 추측하지 않습니다. 앞 화면 응답에 실려 옵니다.**
+
+```
+D2 (재료 확인)            POST /meals/identify → food_id
+   └→ H4  GET /foods/{food_id}/alternatives
+          options[kind=substitute] → { screen:"H3", ingredient_ids:[1,2] }
+          options[kind=menu]       → { screen:"H5", food_id:1 }
+             └→ H3  GET /substitutions?ingredient_ids=1,2
+                     recipes[] → { recipe_id, title, screen:"H2" }
+                        └→ H2  GET /recipes/{recipe_id}
+             └→ H5  GET /foods/{food_id}/menu-alternatives
+
+H1 (AI 대화)              POST /chat/messages
+   suggestions[] → { screen:"D2"|"H4", food_id, food_name }
+
+G  (나의 식탁)            GET /mytable
+   saved_recommendations[] → { kind:"recipe", ref_id } → H2
+```
+
+- **H4 의 `ingredient_ids` 는 치환안이 실제로 있는 재료만** 담습니다.
+  없는 id 를 넘기면 H3 가 빈 화면이 되기 때문입니다. 빈 배열이면 그 옵션을 숨기세요
+- **H2 의 진입점은 H3 의 `recipes` 와 G 의 저장한 추천 둘뿐입니다.**
+  독립적으로 레시피 목록을 보여주는 화면은 없습니다
 
 **`dismiss` 를 누르면 별도 호출이 필요합니다.**
 
@@ -460,8 +488,18 @@ F2 하단 "이런 음식에 양파가 들어있어요". **읽기 전용입니다
 { "session_id": 4,
   "reply": "지난 기록에서 제육볶음은 3번 중 1번 불편함이 있었어요. 마늘을 빼고 드셔보시는 건 어떨까요?",
   "blocked": false,
-  "suggestions": [ { "label": "대체안 보기", "screen": "H4", "food_id": 9 } ] }
+  "suggestions": [
+    { "label": "제육볶음 기록하기", "screen": "D2", "food_id": 9, "food_name": "제육볶음" },
+    { "label": "이렇게 먹어볼까요", "screen": "H4", "food_id": 9, "food_name": "제육볶음" }
+  ] }
 ```
+
+**`suggestions` 는 사용자가 말한 음식이 마스터에 있을 때만 옵니다.**
+이 식별에는 LLM 을 쓰지 않습니다 — 마스터 조회입니다.
+LLM 이 지어낸 이름으로 넘어가면 그다음 화면이 전부 비기 때문입니다.
+
+D1 "메뉴 검색" 을 H1 으로 보내는 흐름이면, 이 칩의 `food_id` · `food_name` 을
+그대로 들고 D2 로 넘어가면 됩니다. 차단된 답변에는 칩이 없습니다.
 
 의료 질문이 오면:
 

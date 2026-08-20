@@ -265,6 +265,27 @@ def violations(reply: str) -> list[str]:
 #  묶기
 # ══════════════════════════════════════════
 
+def food_suggestions(db: Session, text: str) -> list[dict]:
+    """사용자가 말한 음식이 마스터에 있으면 그 화면으로 가는 칩을 만든다.
+
+    ★ 이 식별에 LLM 을 쓰지 않는다. 마스터 조회다.
+      D1 "메뉴 검색" 이 H1 으로 들어오는 흐름에서, 여기서 나온 food_id 로
+      프론트가 D2(기록) 나 H4(대체안) 로 넘어간다.
+      LLM 이 지어낸 음식 이름으로 넘어가면 그다음 화면이 전부 빈다.
+    """
+    from services import ingredients as ing_svc
+
+    food = ing_svc.find_food(db, text)
+    if food is None:
+        return []
+    return [
+        {"label": f"{food.name} 기록하기", "screen": "D2",
+         "food_id": food.id, "food_name": food.name},
+        {"label": "이렇게 먹어볼까요", "screen": "H4",
+         "food_id": food.id, "food_name": food.name},
+    ]
+
+
 def answer(db: Session, user: User, text: str) -> dict:
     """H1 한 턴. 반환값이 그대로 API 응답이 된다."""
 
@@ -305,7 +326,8 @@ def answer(db: Session, user: User, text: str) -> dict:
         bad = violations(reply)
         if not bad:
             return _out(reply, blocked=False, reason=None,
-                        llm_called=True, retry=attempt, kind=kind)
+                        llm_called=True, retry=attempt, kind=kind,
+                        suggestions=food_suggestions(db, text))
 
         feedback = ("\n\n[교정] 방금 답변이 규칙을 어겼다: "
                     + "; ".join(bad) + ". 다시 써라.")
@@ -316,7 +338,8 @@ def answer(db: Session, user: User, text: str) -> dict:
 
 
 def _out(reply: str, *, blocked: bool, reason: str | None, llm_called: bool,
-         retry: int = 0, fell_back: bool = False, kind: str | None = None) -> dict:
+         retry: int = 0, fell_back: bool = False, kind: str | None = None,
+         suggestions: list[dict] | None = None) -> dict:
     return {
         "reply": reply,
         "blocked": blocked,
@@ -325,4 +348,5 @@ def _out(reply: str, *, blocked: bool, reason: str | None, llm_called: bool,
         "_retry": retry,
         "_fell_back": fell_back,
         "_kind": kind,
+        "suggestions": suggestions or [],
     }
