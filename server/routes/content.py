@@ -108,22 +108,33 @@ async def alternatives(food_id: int, dev: str = Depends(device_id), db: Session 
         .filter(FoodIngredient.food_id == food_id)
         .distinct().all())]
 
-    return {
-        "food_name": food.name,
-        "ingredients": names,
-        "options": [
-            {"kind": "portion", "title": "양 조절",
-             "detail": f"1/2인 또는 {food.name} 양을 줄여보세요."},
-            {"kind": "omit", "title": "빼서 먹기", "detail": f"{omit_text} 빼거나 줄여보세요."},
+    # 갈 곳이 없는 옵션은 아예 안 보낸다.
+    #
+    # 이미 FODMAP 이 낮은 음식(김밥·샐러드 등)에는 대체 메뉴를 달지 않았다.
+    # 괜찮은 음식에 "이건 어떠세요" 를 띄우면 그 자체가
+    # "지금 먹는 게 문제" 라는 판정이 된다. (절대 원칙 ①)
+    # 그런데 옵션만 보여주고 눌렀더니 빈 화면이면 그건 그거대로 고장이다.
+    has_menu = (db.query(MenuAlternative)
+                .filter(MenuAlternative.food_id == food_id).count() > 0)
+
+    options = [
+        {"kind": "portion", "title": "양 조절",
+         "detail": f"1/2인 또는 {food.name} 양을 줄여보세요."},
+        {"kind": "omit", "title": "빼서 먹기", "detail": f"{omit_text} 빼거나 줄여보세요."},
+    ]
+    if sub_ids:
+        options.append(
+            # H3 로 갈 때 그대로 넘기면 된다. 프론트가 id 를 만들 필요가 없다.
             {"kind": "substitute", "title": "대체 성분 제안",
              "detail": "더 편안할 수 있는 재료로 바꿔보세요.",
-             # H3 로 갈 때 그대로 넘기면 된다. 프론트가 id 를 만들 필요가 없다.
-             "screen": "H3", "ingredient_ids": sub_ids},
+             "screen": "H3", "ingredient_ids": sub_ids})
+    if has_menu:
+        options.append(
             {"kind": "menu", "title": "대체 메뉴 제안",
              "detail": "비슷한 맛의 다른 메뉴를 찾아드릴게요.",
-             "screen": "H5", "food_id": food_id},
-        ],
-    }
+             "screen": "H5", "food_id": food_id})
+
+    return {"food_name": food.name, "ingredients": names, "options": options}
 
 
 @router.get(
