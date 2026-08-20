@@ -329,7 +329,8 @@ export default function SymptomDetailScreen() {
         <BottomButton
           label={step === 1 ? '기록하기' : '기록 마치기'}
           onPress={step === 1 ? handleStep1Next : handleFinish}
-          disabled={step === 1 ? !step1Ready : !step2Ready || saving}
+          loading={step === 2 && saving}
+          disabled={step === 1 ? !step1Ready : !step2Ready}
         />
       </ThemedView>
     </ScrollView>
