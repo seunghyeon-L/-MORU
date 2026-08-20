@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CameraIcon, ChevronRightIcon, PulseIcon, SmilePlusIcon } from '@/components/common/icons';
@@ -9,9 +9,16 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useMoruData } from '@/hooks/useMoruData';
 import { useTheme } from '@/hooks/use-theme';
-import { Spacing } from '@/constants/theme';
+import { BottomTabInset, Spacing } from '@/constants/theme';
 import { PORTION_OPTIONS } from '@/types/food';
 import { OVERALL_STATE_OPTIONS, SYMPTOM_TYPE_OPTIONS, type Severity } from '@/types/symptom';
+
+/**
+ * 탭 화면 콘텐츠 맨 아래에서 하단 탭바가 먹는 높이. 자세한 근거는 (tabs)/index.tsx 의 같은 상수 주석 참고.
+ * 요약: 탭 화면의 레이아웃 높이는 세 플랫폼 모두 "탭바를 포함한 전체 높이"인데,
+ * 안드로이드만 실제 콘텐츠 영역이 탭바 위에서 끝나서(TabsHost.kt 의 세로 LinearLayout)
+ * 아래쪽이 잘린다. iOS·웹은 탭바가 덮는다. 어느 쪽이든 이만큼은 비워 둬야 한다.
+ */
 
 /** severity 1~9 → "조금/보통/많이" 3단계 표현 (E0 화면과 동일한 문구 사용) */
 function severityLabel(severity: Severity): string {
@@ -88,7 +95,10 @@ export default function RecordScreen() {
         type="onboardingBackground"
         style={[
           styles.container,
-          { paddingTop: insets.top + Spacing.three, paddingBottom: insets.bottom + Spacing.six },
+          {
+            paddingTop: insets.top + Spacing.three,
+            paddingBottom: insets.bottom + BottomTabInset + Spacing.three,
+          },
         ]}>
         <ThemedText type="h1" themeColor="textPrimary" style={styles.title}>
           기록
@@ -104,7 +114,10 @@ export default function RecordScreen() {
         <View style={styles.quickRow}>
           {/* 음식 기록 → D1 입력 방식 선택 바텀시트를 연다 */}
           <Pressable style={styles.quickCardPressable} onPress={() => setFoodSheetVisible(true)}>
-            <ThemedView type="surfaceCard" style={styles.quickCard}>
+            {({ pressed }) => (
+            <ThemedView
+              type={pressed ? 'surfacePressed' : 'surfaceCard'}
+              style={styles.quickCard}>
               <ThemedView type="brandLight" style={styles.quickIcon}>
                 <CameraIcon size={20} color={theme.brandText} />
               </ThemedView>
@@ -115,10 +128,14 @@ export default function RecordScreen() {
                 사진이나 메뉴로 간단하게 남겨요
               </ThemedText>
             </ThemedView>
+            )}
           </Pressable>
 
           <Pressable style={styles.quickCardPressable} onPress={() => router.push('/symptom')}>
-            <ThemedView type="surfaceCard" style={styles.quickCard}>
+            {({ pressed }) => (
+            <ThemedView
+              type={pressed ? 'surfacePressed' : 'surfaceCard'}
+              style={styles.quickCard}>
               <ThemedView type="coralLight" style={styles.quickIcon}>
                 <PulseIcon size={20} color={theme.coral} />
               </ThemedView>
@@ -129,11 +146,15 @@ export default function RecordScreen() {
                 불편했던 순간과 상황을 함께 남겨요
               </ThemedText>
             </ThemedView>
+            )}
           </Pressable>
         </View>
 
         <Pressable onPress={() => router.push('/food/chat')}>
-          <ThemedView type="brandLighter" style={styles.aiCard}>
+          {({ pressed }) => (
+          <ThemedView
+            type={pressed ? 'elementPressed' : 'brandLighter'}
+            style={styles.aiCard}>
             <ThemedView type="brand" style={styles.aiBadge}>
               <ThemedText type="label" themeColor="textOnBrand">
                 AI
@@ -149,6 +170,7 @@ export default function RecordScreen() {
             </View>
             <ChevronRightIcon size={18} color={theme.textMuted} />
           </ThemedView>
+          )}
         </Pressable>
 
         <ThemedText type="label" themeColor="textPrimary" style={styles.sectionLabel}>

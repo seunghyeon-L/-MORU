@@ -68,14 +68,35 @@ function GridOption({
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
-      style={({ pressed }) => [styles.gridItem, pressed && styles.pressed]}>
-      <ThemedView
-        type={selected ? 'brand' : 'surfaceCard'}
-        style={[styles.gridInner, { borderColor: selected ? theme.brand : theme.borderSubtle }]}>
-        <ThemedText type="label" themeColor={selected ? 'textOnBrand' : 'textPrimary'}>
-          {label}
-        </ThemedText>
-      </ThemedView>
+      style={styles.gridItem}>
+      {({ pressed }) => (
+        /*
+          눌림을 바깥 Pressable 의 opacity 로 표현하지 않는다.
+          안드로이드는 오프스크린 합성을 하지 않아 알파를 그리기 연산마다 따로 곱하므로,
+          불투명 배경을 가진 이 칸과 그 위 글자의 최종색이 어긋나 글자 주변에
+          밝은 사각형이 떠 보인다(MORUButton 주석 참고).
+          대신 색을 칠하는 이 View 자신의 backgroundColor 를 바꾼다.
+          라벨은 textPrimary 라 눌린 배경(surfacePressed) 위에서도 9.93:1 로 그대로 둔다.
+        */
+        <View
+          style={[
+            styles.gridInner,
+            {
+              backgroundColor: selected
+                ? pressed
+                  ? theme.brandPressed
+                  : theme.brand
+                : pressed
+                  ? theme.surfacePressed
+                  : theme.surfaceCard,
+              borderColor: selected ? theme.brand : theme.borderSubtle,
+            },
+          ]}>
+          <ThemedText type="label" themeColor={selected ? 'textOnBrand' : 'textPrimary'}>
+            {label}
+          </ThemedText>
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -392,8 +413,5 @@ const styles = StyleSheet.create({
   factorNote: {
     padding: Spacing.three,
     borderRadius: Spacing.three,
-  },
-  pressed: {
-    opacity: 0.7,
   },
 });

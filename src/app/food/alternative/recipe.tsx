@@ -102,7 +102,7 @@ export default function AlternativeRecipeScreen() {
               {recipe.tip ? (
                 <ThemedView type="onboardingBackground" style={styles.tipBox}>
                   <ThemedView type="brandLight" style={styles.tipBadge}>
-                    <ThemedText type="caption" themeColor="brandText" style={styles.tipLabel}>
+                    <ThemedText type="caption" themeColor="textPrimary" style={styles.tipLabel}>
                       TIP
                     </ThemedText>
                   </ThemedView>

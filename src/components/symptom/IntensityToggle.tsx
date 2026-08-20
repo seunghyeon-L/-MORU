@@ -16,6 +16,20 @@ export type IntensityToggleProps = {
 export function IntensityToggle({ title, value, onChange }: IntensityToggleProps) {
   const theme = useTheme();
 
+  /**
+   * 누름을 opacity 로 표현하지 않는다. 안드로이드는 오프스크린 합성을 하지 않고
+   * 알파를 그리기 연산마다 따로 곱해서, 래퍼에 opacity 를 걸면 그 안의 불투명한 알약 배경과
+   * 카드의 elevation 그림자가 서로 다른 알파로 그려져 이음매가 보인다.
+   * 대신 알약 자신의 배경색을 바꾼다.
+   *
+   * 안 고른 알약의 평상 배경(backgroundElement)은 이미 회색이라
+   * surfacePressed 로는 휘도비 1.09:1 에 그친다. 한 단 더 내린 elementPressed 를 쓴다(1.22:1).
+   */
+  const backgroundFor = (selected: boolean, pressed: boolean) => {
+    if (selected) return pressed ? theme.brandPressed : theme.brand;
+    return pressed ? theme.elementPressed : theme.backgroundElement;
+  };
+
   return (
     <ThemedView type="surfaceCard" style={styles.card}>
       <ThemedText type="label" themeColor="textPrimary">
@@ -30,14 +44,24 @@ export function IntensityToggle({ title, value, onChange }: IntensityToggleProps
               accessibilityRole="button"
               accessibilityState={{ selected }}
               onPress={() => onChange(option.id)}
-              style={({ pressed }) => [styles.item, pressed && styles.pressed]}>
-              <ThemedView
-                type={selected ? 'brand' : 'backgroundElement'}
-                style={[styles.pill, { borderColor: selected ? theme.brand : theme.borderSubtle }]}>
-                <ThemedText type="label" themeColor={selected ? 'textOnBrand' : 'textSecondary'}>
-                  {option.label}
-                </ThemedText>
-              </ThemedView>
+              style={styles.item}>
+              {({ pressed }) => (
+                <View
+                  style={[
+                    styles.pill,
+                    {
+                      backgroundColor: backgroundFor(selected, pressed),
+                      borderColor: selected ? theme.brand : theme.borderSubtle,
+                    },
+                  ]}>
+                  {/* 눌린 배경 위에서 textSecondary 는 4.27:1 이라 textPrimary 로 올린다 */}
+                  <ThemedText
+                    type="label"
+                    themeColor={selected ? 'textOnBrand' : pressed ? 'textPrimary' : 'textSecondary'}>
+                    {option.label}
+                  </ThemedText>
+                </View>
+              )}
             </Pressable>
           );
         })}
@@ -69,8 +93,5 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.two,
     borderWidth: 1,
     alignItems: 'center',
-  },
-  pressed: {
-    opacity: 0.7,
   },
 });

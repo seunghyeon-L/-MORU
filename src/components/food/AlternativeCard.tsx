@@ -24,7 +24,9 @@ export function AlternativeCard({ alternative, index, selected, onPress }: Alter
       accessory={
         index !== undefined ? (
           <ThemedView type="brandLight" style={styles.badge}>
-            <ThemedText type="caption" themeColor="brandText">
+            {/* brandText 는 brandLight(#C3D9CE) 위에서 3.87:1 이라 12px 숫자에는 모자랐다.
+                textPrimary 로 올리면 라이트 8.28:1 · 다크 8.66:1 이 된다. */}
+            <ThemedText type="caption" themeColor="textPrimary">
               {index}
             </ThemedText>
           </ThemedView>

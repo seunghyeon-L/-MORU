@@ -179,9 +179,16 @@ export default function SafetyScreen() {
           같은 함수를 부르고 있었다. 항목을 체크해두고도
           "해당하는 것이 없어요" 를 누를 수 있어서, 버튼 글자가 화면과 어긋났다.
         */}
+        {/*
+          loading 은 disabled 와 별개다.
+          체크한 항목이 있으면 POST /onboarding/safety 응답을 기다리는데,
+          disabled 만 주면 버튼이 흐려질 뿐 기다리는 중인지 고장난 건지 구분이 안 된다.
+          항목이 없으면 POST 없이 바로 넘어가므로 submitting 이 true 가 되지 않는다.
+        */}
         <BottomButton
           label={selected.length > 0 ? '다음' : (data?.none_label ?? '해당하는 것이 없어요')}
           disabled={submitting}
+          loading={submitting}
           onPress={handleContinue}
         />
       </ThemedView>

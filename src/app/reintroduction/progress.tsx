@@ -34,7 +34,12 @@ export default function ReintroductionProgressScreen() {
 
   const [challenge, setChallenge] = useState<ChallengeDetail | null>(null);
   const [loadError, setLoadError] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  /*
+    boolean 이 아니라 '지금 보내는 중인 답' 을 담는다.
+    두 버튼이 같은 요청을 쓰므로 boolean 이면 누르지도 않은 버튼까지 대기 표시가 붙는다.
+    어느 쪽을 눌렀는지 화면이 되돌려줘야 사용자가 자기 행동을 확인할 수 있다.
+  */
+  const [pending, setPending] = useState<ChallengeAttemptResult | null>(null);
   const [submitError, setSubmitError] = useState(false);
 
   useEffect(() => {
@@ -50,10 +55,10 @@ export default function ReintroductionProgressScreen() {
   }, [challengeId]);
 
   const handleAttempt = async (result: ChallengeAttemptResult) => {
-    if (!challenge || submitting) return;
+    if (!challenge || pending) return;
 
     setSubmitError(false);
-    setSubmitting(true);
+    setPending(result);
     try {
       const response = await api.recordChallengeAttempt(challenge.challenge_id, challenge.current_seq, {
         result,
@@ -75,7 +80,7 @@ export default function ReintroductionProgressScreen() {
       console.error('[F3] POST attempt failed:', err);
       setSubmitError(true);
     } finally {
-      setSubmitting(false);
+      setPending(null);
     }
   };
 
@@ -187,18 +192,21 @@ export default function ReintroductionProgressScreen() {
             styles.footerRow,
             { paddingHorizontal: Spacing.four },
           ]}>
+          {/* 두 답 모두 POST /challenges/{id}/attempts/{seq} 응답을 기다린다 */}
           <View style={styles.footerButton}>
             <MORUButton
               label="괜찮았어요"
               variant="secondary"
-              disabled={submitting}
+              disabled={pending !== null}
+              loading={pending === 'no_reaction'}
               onPress={() => handleAttempt('no_reaction')}
             />
           </View>
           <View style={styles.footerButton}>
             <MORUButton
               label="불편함이 있었어요"
-              disabled={submitting}
+              disabled={pending !== null}
+              loading={pending === 'reaction'}
               onPress={() => handleAttempt('reaction')}
             />
           </View>
@@ -208,11 +216,15 @@ export default function ReintroductionProgressScreen() {
             styles.footerRow,
             { paddingBottom: insets.bottom + Spacing.three, paddingHorizontal: Spacing.four },
           ]}>
+          {/*
+            이 버튼은 화면만 옮긴다 — 서버를 기다리지 않으므로 loading 을 주지 않는다.
+            보내는 중에 빠져나가지 못하게 막기만 한다.
+          */}
           <View style={styles.footerButton}>
             <MORUButton
               label="다음에 할게요"
               variant="secondary"
-              disabled={submitting}
+              disabled={pending !== null}
               onPress={() => router.push('/reintroduction')}
             />
           </View>

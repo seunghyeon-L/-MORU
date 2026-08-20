@@ -122,25 +122,49 @@ export default function ReintroductionSetupScreen() {
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
                     onPress={() => setDays(option.days)}
-                    style={({ pressed }) => [styles.dayItem, pressed && styles.pressed]}>
-                    <ThemedView
-                      type={selected ? 'brand' : 'surfaceCard'}
-                      style={[
-                        styles.dayCard,
-                        { borderColor: selected ? theme.brand : theme.borderSubtle },
-                      ]}>
-                      <ThemedText
-                        type="label"
-                        themeColor={selected ? 'textOnBrand' : 'textPrimary'}
-                        style={styles.dayNumber}>
-                        {`${option.days}일`}
-                      </ThemedText>
-                      <ThemedText
-                        type="caption"
-                        themeColor={selected ? 'textOnBrand' : 'textMuted'}>
-                        {option.label}
-                      </ThemedText>
-                    </ThemedView>
+                    style={styles.dayItem}>
+                    {({ pressed }) => (
+                      /*
+                        눌림을 바깥 Pressable 의 opacity 로 표현하지 않는다.
+                        안드로이드는 오프스크린 합성을 하지 않아 알파를 그리기 연산마다
+                        따로 곱하므로, 불투명 배경을 가진 이 카드와 그 위 글자의 최종색이
+                        어긋나 글자 주변에 밝은 사각형이 떠 보인다(MORUButton 주석 참고).
+                        대신 색을 칠하는 이 View 자신의 backgroundColor 를 바꾼다.
+                      */
+                      <View
+                        style={[
+                          styles.dayCard,
+                          {
+                            backgroundColor: selected
+                              ? pressed
+                                ? theme.brandPressed
+                                : theme.brand
+                              : pressed
+                                ? theme.surfacePressed
+                                : theme.surfaceCard,
+                            borderColor: selected ? theme.brand : theme.borderSubtle,
+                          },
+                        ]}>
+                        <ThemedText
+                          type="label"
+                          themeColor={selected ? 'textOnBrand' : 'textPrimary'}
+                          style={styles.dayNumber}>
+                          {`${option.days}일`}
+                        </ThemedText>
+                        {/*
+                          누르는 동안만 캡션을 textSecondary 로 올린다.
+                          textMuted 는 surfacePressed(#E0E9E5) 위에서 4.26:1 로 AA 미달이고,
+                          textSecondary 면 4.79:1(다크 6.63:1)로 올라온다.
+                        */}
+                        <ThemedText
+                          type="caption"
+                          themeColor={
+                            selected ? 'textOnBrand' : pressed ? 'textSecondary' : 'textMuted'
+                          }>
+                          {option.label}
+                        </ThemedText>
+                      </View>
+                    )}
                   </Pressable>
                 );
               })}
@@ -185,9 +209,11 @@ export default function ReintroductionSetupScreen() {
           ) : null}
         </View>
 
+        {/* POST /challenges 응답을 기다리는 동안이라 disabled 만으로는 대기 중임이 안 보인다 */}
         <BottomButton
           label="이렇게 시작할게요"
           disabled={!days || submitting}
+          loading={submitting}
           onPress={handleConfirm}
         />
       </ThemedView>
@@ -257,9 +283,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.two,
-  },
-  pressed: {
-    opacity: 0.7,
   },
   errorText: {
     marginTop: -Spacing.one,

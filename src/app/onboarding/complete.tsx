@@ -39,7 +39,7 @@ export default function OnboardingCompleteScreen() {
             {COMPLETE_STEPS.map((step, index) => (
               <View key={step} style={styles.stepRow}>
                 <ThemedView type="brandLighter" style={styles.stepBadge}>
-                  <ThemedText type="label" themeColor="brandText">
+                  <ThemedText type="label" themeColor="textPrimary">
                     {index + 1}
                   </ThemedText>
                 </ThemedView>

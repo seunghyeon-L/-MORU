@@ -73,7 +73,7 @@ export default function StartScreen() {
             {INTRO_STEPS.map((step, index) => (
               <ThemedView key={step.title} type="surfaceCard" style={styles.card}>
                 <ThemedView type="brandLight" style={styles.cardBadge}>
-                  <ThemedText type="caption" themeColor="brandText">
+                  <ThemedText type="caption" themeColor="textPrimary">
                     {index + 1}
                   </ThemedText>
                 </ThemedView>

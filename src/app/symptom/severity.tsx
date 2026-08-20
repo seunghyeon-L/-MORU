@@ -138,10 +138,15 @@ export default function SymptomSeverityScreen() {
         </View>
 
         {severity !== undefined ? (
+          /*
+            '기록하기' 쪽만 POST /symptoms 와 목록 갱신을 기다린다.
+            '다음' 은 다음 화면으로 넘기기만 하므로 saving 이 true 가 되지 않는다.
+          */
           <BottomButton
             label={willContinue ? '다음' : '기록하기'}
             onPress={handlePress}
             disabled={saving}
+            loading={saving}
           />
         ) : null}
       </ThemedView>

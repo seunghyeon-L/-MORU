@@ -270,15 +270,24 @@ export default function FoodChatScreen() {
             />
           </ThemedView>
           <Pressable onPress={() => send(input, true)} disabled={!input.trim() || sending}>
-            <ThemedView
-              type="brand"
-              style={[styles.sendButton, (!input.trim() || sending) && styles.sendButtonDimmed]}>
-              {sending ? (
-                <ActivityIndicator size="small" color={theme.textOnBrand} />
-              ) : (
-                <SendArrowIcon size={18} color={theme.textOnBrand} />
-              )}
-            </ThemedView>
+            {({ pressed }) => {
+              // 입력이 비어 있는 게 이 화면의 기본 상태다. 즉 '비활성' 이 정상 모습이다.
+              // 전에는 opacity 0.5 로 표현했는데, 안드로이드는 배경 원과 아이콘에
+              // 알파를 따로 곱해서 둘의 최종색이 갈리고 화살표가 의도보다 더 묻혔다.
+              // 색을 바꾸면 레이어가 하나뿐이라 갈릴 것이 없다.
+              const off = !input.trim() || sending;
+              const bg = off ? theme.brandDisabled : pressed ? theme.brandPressed : theme.brand;
+              const fg = off ? theme.textDisabled : theme.textOnBrand;
+              return (
+                <View style={[styles.sendButton, { backgroundColor: bg }]}>
+                  {sending ? (
+                    <ActivityIndicator size="small" color={fg} />
+                  ) : (
+                    <SendArrowIcon size={18} color={fg} />
+                  )}
+                </View>
+              );
+            }}
           </Pressable>
         </View>
       </ThemedView>
@@ -355,8 +364,5 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  sendButtonDimmed: {
-    opacity: 0.5,
   },
 });

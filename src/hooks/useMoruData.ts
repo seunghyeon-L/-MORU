@@ -21,6 +21,7 @@ import {
   ALLERGY_OPTIONS,
   AVOIDED_FOOD_OPTIONS,
   EMPTY_ONBOARDING_DATA,
+  toServerLabels,
   type BaselineFrequency,
   type OnboardingData,
   type SymptomFrequency,
@@ -112,28 +113,29 @@ export function useMoruData() {
 
   /**
    * 온보딩 마지막 화면에서 호출. POST /onboarding/profile 은 화면에 표시된 칩 문자열을
-   * 그대로 보낸다 — "없음"을 뜻하는 로컬 전용 선택지('none')만 제외하고 임의로 바꾸지 않는다.
+   * 그대로 보낸다 — 임의로 바꾸는 건 두 가지뿐이고, 둘 다 toServerLabels 안에 있다.
+   * "없음"을 뜻하는 로컬 전용 선택지('none')를 빼는 것, 그리고 '기타' 를 라벨 "기타" 가 아니라
+   * 사용자가 적은 이름으로 펼치는 것. 후자를 안 하면 서버가 알레르기를 하나도 못 걸러낸다.
    */
   const completeOnboarding = useCallback(async () => {
     const completed: OnboardingData = { ...state.onboarding, completed: true };
     setState({ onboarding: completed });
 
-    const allergies = completed.allergies
-      .filter((id) => id !== 'none')
-      .flatMap((id) => {
-        const label = ALLERGY_OPTIONS.find((option) => option.id === id)?.label;
-        return label ? [label] : [];
-      });
-    const avoidedFoods = completed.avoidedFoods
-      .filter((id) => id !== 'none')
-      .flatMap((id) => {
-        const label = AVOIDED_FOOD_OPTIONS.find((option) => option.id === id)?.label;
-        return label ? [label] : [];
-      });
-    const baselineSymptoms = completed.usualSymptoms.flatMap((id) => {
-      const label = SYMPTOM_TYPE_OPTIONS.find((option) => option.id === id)?.label;
-      return label ? [label] : [];
-    });
+    const allergies = toServerLabels(
+      completed.allergies,
+      ALLERGY_OPTIONS,
+      completed.allergyEtcText,
+    );
+    const avoidedFoods = toServerLabels(
+      completed.avoidedFoods,
+      AVOIDED_FOOD_OPTIONS,
+      completed.avoidedFoodEtcText,
+    );
+    const baselineSymptoms = toServerLabels(
+      completed.usualSymptoms,
+      SYMPTOM_TYPE_OPTIONS,
+      completed.usualSymptomEtcText,
+    );
 
     await api.saveOnboardingData({
       allergies,

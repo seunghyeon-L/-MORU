@@ -128,9 +128,15 @@ export default function ReintroductionResultScreen() {
           ) : null}
         </View>
 
+        {/*
+          기다리는 쪽은 저장 버튼 하나다 (api.saveChallenge).
+          보조 버튼은 화면만 옮기므로 loading 을 주면 일하지 않는 버튼이 도는 것처럼 보인다.
+          저장 중에 빠져나가지 못하게 disabled 만 준다.
+        */}
         <BottomButton
           label="나의 식탁에 저장하기"
           disabled={saving}
+          loading={saving}
           onPress={handleSave}
           secondary={{
             label: '양을 줄여서 다시 해볼래요',

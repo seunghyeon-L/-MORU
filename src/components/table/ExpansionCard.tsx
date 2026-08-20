@@ -21,7 +21,10 @@ export function ExpansionCard({ headline, sub }: ExpansionCardProps) {
       <ThemedText type="label" themeColor="textOnBrand" style={styles.headline}>
         {headline}
       </ThemedText>
-      <ThemedText type="bodyS" themeColor="textOnBrand" style={styles.body}>
+      {/* 예전에는 opacity 0.92 를 걸어 한 톤 낮췄는데, 안드로이드는 글자에도 알파를
+          그리기 연산마다 곱해서 brand 배경과 섞인 결과색이 되고 대비가 6.12:1 → 5.24:1 로 떨어진다.
+          두 줄의 위계는 글자 크기(17 → 13.5)로 이미 충분해서 알파를 걷어냈다. */}
+      <ThemedText type="bodyS" themeColor="textOnBrand">
         {sub}
       </ThemedText>
     </ThemedView>
@@ -37,8 +40,5 @@ const styles = StyleSheet.create({
   headline: {
     fontSize: 17,
     lineHeight: 24,
-  },
-  body: {
-    opacity: 0.92,
   },
 });

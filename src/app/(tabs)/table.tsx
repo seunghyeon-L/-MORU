@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CandidateFoodCard } from '@/components/table/CandidateFoodCard';
@@ -9,9 +9,16 @@ import { MoreVerticalIcon } from '@/components/common/icons';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useTheme } from '@/hooks/use-theme';
-import { Spacing } from '@/constants/theme';
+import { BottomTabInset, Spacing } from '@/constants/theme';
 import * as api from '@/services/api';
 import type { MyTableResponse, MyTableSection } from '@/types/food';
+
+/**
+ * 탭 화면 콘텐츠 맨 아래에서 하단 탭바가 먹는 높이. 자세한 근거는 (tabs)/index.tsx 의 같은 상수 주석 참고.
+ * 요약: 탭 화면의 레이아웃 높이는 세 플랫폼 모두 "탭바를 포함한 전체 높이"인데,
+ * 안드로이드만 실제 콘텐츠 영역이 탭바 위에서 끝나서(TabsHost.kt 의 세로 LinearLayout)
+ * 아래쪽이 잘린다. iOS·웹은 탭바가 덮는다. 어느 쪽이든 이만큼은 비워 둬야 한다.
+ */
 
 function TableSectionBlock({
   section,
@@ -121,7 +128,10 @@ export default function TableScreen() {
         type="onboardingBackground"
         style={[
           styles.container,
-          { paddingTop: insets.top + Spacing.three, paddingBottom: insets.bottom + Spacing.six },
+          {
+            paddingTop: insets.top + Spacing.three,
+            paddingBottom: insets.bottom + BottomTabInset + Spacing.three,
+          },
         ]}>
         <View style={styles.headerRow}>
           <ThemedText type="h1" themeColor="textPrimary">

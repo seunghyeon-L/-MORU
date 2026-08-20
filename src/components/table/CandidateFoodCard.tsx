@@ -19,6 +19,8 @@ export type CandidateFoodCardProps = {
  */
 export function CandidateFoodCard({ food, onCheck }: CandidateFoodCardProps) {
   const theme = useTheme();
+  // children-as-function 안에서는 food.action 의 좁히기가 풀린다. 밖에서 잡아둔다.
+  const action = food.action;
 
   return (
     <ThemedView
@@ -35,16 +37,23 @@ export function CandidateFoodCard({ food, onCheck }: CandidateFoodCardProps) {
         ) : null}
       </View>
 
-      {food.action ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={onCheck}
-          style={({ pressed }) => pressed && styles.pressed}>
-          <ThemedView type="brandSoft" style={styles.checkButton}>
-            <ThemedText type="label" themeColor="brandText">
-              {food.action.label}
-            </ThemedText>
-          </ThemedView>
+      {action ? (
+        <Pressable accessibilityRole="button" onPress={onCheck}>
+          {({ pressed }) => (
+            // 눌림을 래퍼 opacity 로 표현하면 안드로이드에서 이음매가 보인다.
+            // HWUI 가 오프스크린 합성 없이 알파를 그리기 연산마다 개별로 곱해서,
+            // 겹친 불투명 레이어(알약 배경 · 그 위 글자)의 최종색이 서로 갈린다.
+            // 색을 칠하는 View 자신의 배경을 바꾸면 레이어가 하나뿐이라 갈릴 것이 없다.
+            <View
+              style={[
+                styles.checkButton,
+                { backgroundColor: pressed ? theme.elementPressed : theme.brandSoft },
+              ]}>
+              <ThemedText type="label" themeColor="brandText">
+                {action.label}
+              </ThemedText>
+            </View>
+          )}
         </Pressable>
       ) : null}
     </ThemedView>
@@ -68,7 +77,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     borderRadius: 999,
   },
-  pressed: {
-    opacity: 0.7,
+  _unusedPressed: {
   },
 });

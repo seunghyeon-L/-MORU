@@ -127,14 +127,23 @@ export type OnboardingData = {
   /** medical 화면에서 "이미 병원에서 확인했어요"를 선택한 경우 true */
   medicalCheckConfirmed: boolean;
   allergies: Allergy[];
+  /**
+   * '기타' 를 고른 사람이 직접 적은 음식 이름.
+   *
+   * 서버로 보낼 때 'etc' 를 라벨 "기타" 로 바꾸면 안 된다.
+   * "기타" 는 어떤 음식 이름과도 겹치지 않아서 아무것도 걸러내지 못한다.
+   * 이 텍스트를 실제 알레르기 목록 항목으로 펼쳐서 보내야 차단이 동작한다.
+   */
   allergyEtcText?: string;
   /** 밀 알레르기를 선택했을 때만 의미가 있다 */
   celiacDiagnosis?: CeliacDiagnosis;
   avoidedFoods: AvoidedFood[];
+  /** allergyEtcText 와 같은 규칙으로 펼쳐서 보낸다 */
   avoidedFoodEtcText?: string;
   avoidedReasons: AvoidedReason[];
   /** 평소 경험하는 증상 */
   usualSymptoms: SymptomType[];
+  /** allergyEtcText 와 같은 규칙으로 펼쳐서 보낸다 */
   usualSymptomEtcText?: string;
   symptomFrequency?: SymptomFrequency;
   completed: boolean;
@@ -149,6 +158,58 @@ export const EMPTY_ONBOARDING_DATA: OnboardingData = {
   usualSymptoms: [],
   completed: false,
 };
+
+/* ------------------------------------------------------------------ */
+/* 서버로 보낼 라벨 만들기                                               */
+/* ------------------------------------------------------------------ */
+
+function dedupe(labels: string[]): string[] {
+  return [...new Set(labels)];
+}
+
+/**
+ * '기타' 칸에 적은 글을 서버 목록의 개별 항목으로 나눈다.
+ *
+ * 나누는 이유는 서버가 항목을 통째로 부분 문자열 비교하기 때문이다
+ * (services/mytable.py 의 `b in label`). "메밀, 복숭아" 를 한 항목으로 보내면
+ * 그 긴 문자열이 어떤 음식 이름 안에도 들어 있지 않아서 한 개도 못 걸러낸다.
+ * 항목마다 따로 보내야 각각이 비교 대상이 된다.
+ *
+ * 구분자는 쉼표와 줄바꿈뿐이다. 가운뎃점(·)·슬래시는 '우유·유제품' 처럼
+ * 한 음식의 이름 안에서 쓰이는 글자라, 구분자로 삼으면 멀쩡한 이름을 반으로 쪼갠다.
+ */
+export function splitEtcText(text: string | undefined): string[] {
+  if (!text) return [];
+  return dedupe(
+    text
+      .split(/[,，\n]/)
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0),
+  );
+}
+
+/**
+ * 선택한 칩 id 를 서버로 보낼 라벨 목록으로 바꾼다.
+ *
+ * - 'none' 은 "없다" 를 뜻하는 로컬 전용 선택지라 목록에서 뺀다.
+ * - 'etc' 는 라벨 "기타" 대신 사용자가 적은 이름으로 펼친다.
+ *   "기타" 는 어떤 음식·증상 이름과도 겹치지 않아서, 보내봐야 서버가 아무것도 걸러내지 못한다.
+ *   적은 게 없으면 'etc' 자체를 뺀다 — 사용자가 답한 적 없는 "기타" 가 기록에 남는 것보다 낫다.
+ */
+export function toServerLabels<T extends string>(
+  ids: readonly T[],
+  options: readonly Option<T>[],
+  etcText?: string,
+): string[] {
+  return dedupe(
+    ids.flatMap((id) => {
+      if (id === 'none') return [];
+      if (id === 'etc') return splitEtcText(etcText);
+      const label = options.find((option) => option.id === id)?.label;
+      return label ? [label] : [];
+    }),
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /* B2·B3·B4 저장 — POST /onboarding/profile 실제 API 요청/응답            */

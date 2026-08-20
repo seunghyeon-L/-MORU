@@ -1,8 +1,48 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Icon, Label, NativeTabs, VectorIcon } from 'expo-router/unstable-native-tabs';
+import {
+  Icon,
+  Label,
+  NativeTabs,
+  VectorIcon,
+  type NativeTabOptions,
+} from 'expo-router/unstable-native-tabs';
 import { Platform, useColorScheme } from 'react-native';
 
 import { Colors } from '@/constants/theme';
+
+/**
+ * expo-router 의 NativeTabOptions 에는 아직 선언돼 있지 않지만, 옵션 객체는
+ * NativeTabTrigger → NativeTabsView 의 Screen 에서 `{...descriptor.options}` 로
+ * react-native-screens 의 BottomTabsScreen 까지 그대로 흘러간다.
+ * 그래서 타입만 넓혀 주면 실제로 네이티브까지 전달된다.
+ */
+type TabScreenOptions = NativeTabOptions & {
+  overrideScrollViewContentInsetAdjustmentBehavior?: boolean;
+};
+
+/**
+ * iOS 에서 react-native-screens 는 탭이 선택될 때마다 탭 화면의 "첫 자식 체인 첫 ScrollView"를
+ * 찾아 contentInsetAdjustmentBehavior 를 RN 기본값 never 에서 UIKit 기본값 automatic 으로
+ * 되돌린다(RNSBottomTabsScreenComponentView.mm 의 overrideScrollViewBehaviorInFirstDescendantChainIfNeeded,
+ * 기본값 YES). 세 탭 화면 모두 루트가 ScrollView 라 정확히 이 대상에 걸린다.
+ *
+ * automatic 이 되면 UIKit 이 상단 세이프에어리어만큼 콘텐츠를 아래로 밀어 버리는데,
+ * Yoga 레이아웃은 이 보정을 모르므로 콘텐츠 높이는 그대로다. 그만큼 화면 아래가 밀려나
+ * 홈의 "오늘 먹은 것 확인하기" 버튼 아랫부분이 탭바 뒤로 들어가 잘렸다.
+ *
+ * 우리는 세 화면 모두 insets 를 직접 읽어 padding 으로 여백을 주고 있으므로 이 override 를 끈다.
+ * ScrollView 쪽에 contentInsetAdjustmentBehavior="never" 를 지정하는 방법은 탭이 갱신될 때마다
+ * screens 가 다시 덮어써서 막히지 않는다. 화면 옵션이 유일하게 확실한 차단 지점이다.
+ *
+ * Android 는 이 옵션을 보지 않는다(prop 이 @platform ios 이고 TabScreenViewManager 에 setter 가 없다).
+ * 안드로이드의 하단 잘림은 원인이 따로 있고 화면 쪽에서 고쳤다 —
+ * TabsHost 가 세로 LinearLayout 이라 콘텐츠 영역이 탭바 위에서 끝나는데 그 크기가 Yoga 로
+ * 되돌아오지 않아, 탭바 높이만큼 아래가 잘려 나간다. 자세한 건 (tabs)/index.tsx 의
+ * TabBarOverlap 상수 주석에 적어 뒀다. 여기서 손댈 수 있는 부분은 없다.
+ */
+const tabScreenOptions: TabScreenOptions = {
+  overrideScrollViewContentInsetAdjustmentBehavior: false,
+};
 
 /**
  * MORU 하단 탭: 기록 | 홈 | 나의 식탁
@@ -40,7 +80,7 @@ export default function AppTabs() {
         default: { color: colors.textMuted },
         selected: { color: colors.tabActive },
       }}>
-      <NativeTabs.Trigger name="record">
+      <NativeTabs.Trigger name="record" options={tabScreenOptions}>
         <Label>기록</Label>
         <Icon
           {...(Platform.OS === 'ios'
@@ -49,7 +89,7 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="index">
+      <NativeTabs.Trigger name="index" options={tabScreenOptions}>
         <Label>홈</Label>
         <Icon
           {...(Platform.OS === 'ios'
@@ -58,7 +98,7 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="table">
+      <NativeTabs.Trigger name="table" options={tabScreenOptions}>
         <Label>나의 식탁</Label>
         <Icon
           {...(Platform.OS === 'ios'
