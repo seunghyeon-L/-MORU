@@ -1,6 +1,10 @@
 # Expo HAS CHANGED
 
-Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code.
+Read the exact versioned docs at https://docs.expo.dev/versions/v54.0.0/ before writing any code.
+
+**SDK 54 를 쓴다. 올리지 마라.**
+App Store 의 Expo Go 가 54 에서 멈춰 있어서, 55 이상으로 올리면
+아이폰에서 `Project is incompatible with this version of Expo Go` 만 뜬다.
 
 # 세션 간 연락은 `.session-mailbox/`
 
