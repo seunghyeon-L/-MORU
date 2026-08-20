@@ -1,5 +1,6 @@
-import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { useColorScheme } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Icon, Label, NativeTabs, VectorIcon } from 'expo-router/unstable-native-tabs';
+import { Platform, useColorScheme } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 
@@ -28,7 +29,7 @@ import { Colors } from '@/constants/theme';
  */
 export default function AppTabs() {
   const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+  const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
 
   return (
     <NativeTabs
@@ -40,18 +41,30 @@ export default function AppTabs() {
         selected: { color: colors.brand },
       }}>
       <NativeTabs.Trigger name="record">
-        <NativeTabs.Trigger.Label>기록</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="camera" md="photo_camera" />
+        <Label>기록</Label>
+        <Icon
+          {...(Platform.OS === 'ios'
+            ? { sf: 'camera' as const }
+            : { src: <VectorIcon family={MaterialIcons} name="photo-camera" /> })}
+        />
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Label>홈</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="house" md="home" />
+        <Label>홈</Label>
+        <Icon
+          {...(Platform.OS === 'ios'
+            ? { sf: 'house' as const }
+            : { src: <VectorIcon family={MaterialIcons} name="home" /> })}
+        />
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="table">
-        <NativeTabs.Trigger.Label>나의 식탁</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf="fork.knife" md="room_service" />
+        <Label>나의 식탁</Label>
+        <Icon
+          {...(Platform.OS === 'ios'
+            ? { sf: 'fork.knife' as const }
+            : { src: <VectorIcon family={MaterialIcons} name="room-service" /> })}
+        />
       </NativeTabs.Trigger>
     </NativeTabs>
   );
