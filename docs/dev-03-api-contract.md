@@ -544,10 +544,30 @@ LLM 은 사용자 기록과 계산 결과만 압니다. 일반 의학 지식으�
 
 ```json
 { "headline": "제육볶음 대신 이런 메뉴는 어떠세요?",
-  "items": [ { "name": "간장 돼지고기 덮밥", "why": "양념 자극이 적어요." },
-             { "name": "두부 간장 덮밥",     "why": "식물성 단백질로 편안하게." } ],
+  "items": [
+    { "name": "간장 돼지고기 덮밥", "why": "양념 자극이 적어요.", "food_id": null },
+    { "name": "된장찌개",          "why": "매운 기 없이 구수해요.", "food_id": 2 }
+  ],
   "has_more": true }
 ```
+
+**`food_id` 는 대부분 `null` 입니다.** 대체 메뉴는 자유 텍스트라 마스터에 있는 건 일부뿐입니다.
+
+**기록은 `food_id` 로 하지 않습니다.** 이렇게 가세요.
+
+```
+H5 에서 "기록하기"
+  → POST /meals/identify { "text": item.name }     ← food_id 가 null 이어도 됩니다
+  → 응답의 food_id · ingredients 로 D2 를 띄우고
+  → POST /meals
+```
+
+`identify` 는 마스터에 없는 메뉴도 재료를 뽑아줍니다
+(`"맑은 순두부탕"` → `["두부"]`, `confidence: "low"`).
+D1 의 텍스트 입력과 완전히 같은 경로라 코드를 재사용하시면 됩니다.
+
+`food_id` 가 `null` 이 아닐 때만 **그 메뉴로 H4(대체안)를 또 볼 수 있습니다.**
+`null` 이면 H4 버튼을 숨기세요.
 
 ### `GET /substitutions?ingredient_ids=12,15` — H3
 

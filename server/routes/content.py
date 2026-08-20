@@ -132,9 +132,9 @@ async def alternatives(food_id: int, dev: str = Depends(device_id), db: Session 
     responses=ex({
         "headline": "제육볶음 대신 이런 메뉴는 어떠세요?",
         "items": [
-            {"name": "간장 돼지고기 덮밥", "why": "양념 자극이 적어요."},
-            {"name": "두부 간장 덮밥", "why": "식물성 단백질로 편안하게."},
-            {"name": "오징어 숙주볶음", "why": "매운 양념 없이 깔끔해요."},
+            {"name": "간장 돼지고기 덮밥", "why": "양념 자극이 적어요.", "food_id": None},
+            {"name": "두부 간장 덮밥", "why": "식물성 단백질로 편안하게.", "food_id": None},
+            {"name": "된장찌개", "why": "자극이 덜해요.", "food_id": 2},
         ],
         "has_more": True,
     }),
@@ -155,9 +155,22 @@ async def menu_alternatives(food_id: int, dev: str = Depends(device_id), db: Ses
     has_more = len(rows) > LIMIT
     items = rows[:LIMIT]
 
+    # 대체 메뉴는 자유 텍스트다. 마스터에 있는 건 일부뿐이라 food_id 는 nullable.
+    #
+    # ★ 기록은 food_id 로 하지 않는다. POST /meals/identify 로 간다.
+    #   마스터에 없는 메뉴도 재료를 뽑아주기 때문에 D2 가 정상으로 뜬다.
+    #   food_id 는 "이 메뉴로 H4(대체안)를 또 볼 수 있는가" 를 알려줄 뿐이다.
+    from services import ingredients as ing_svc
+
+    out = []
+    for name, why in items:
+        alt = ing_svc.find_food(db, name)
+        out.append({"name": name, "why": why,
+                    "food_id": alt.id if alt else None})
+
     return {
         "headline": f"{food.name} 대신 이런 메뉴는 어떠세요?",
-        "items": [{"name": name, "why": why} for (name, why) in items],
+        "items": out,
         "has_more": has_more,
     }
 
