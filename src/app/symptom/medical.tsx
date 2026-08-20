@@ -13,7 +13,7 @@ const illustration = require('@/assets/images/illustrations/onboarding-medical.p
  * 증상 기록 중 위험 신호(red_flag)로 차단됐을 때의 병원 안내 화면.
  * onboarding/medical(B1x)과 레이아웃은 같지만, 문구는 POST /symptoms 응답의
  * notice.title/body/footer 를 그대로 전달받아 표시한다 — B1x와 문구 출처를 합치지 않는다.
- * "이미 확인했어요"를 누르면 증상 기록(symptom/detail)으로 돌아간다.
+ * "이미 확인했어요"를 누르면 증상 기록 플로우를 벗어나 홈으로 이동한다.
  */
 export default function SymptomMedicalScreen() {
   const router = useRouter();
@@ -66,7 +66,7 @@ export default function SymptomMedicalScreen() {
           secondary={{
             label: '이미 병원에서 확인했어요',
             variant: 'secondary',
-            onPress: () => router.back(),
+            onPress: () => router.replace('/(tabs)'),
           }}
         />
       </ThemedView>

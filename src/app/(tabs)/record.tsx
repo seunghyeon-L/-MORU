@@ -82,6 +82,11 @@ export default function RecordScreen() {
     .sort((a, b) => b.time - a.time)
     .slice(0, 2);
 
+  const todaySymptomRecord = symptomRecords.find((record) => formatDay(record.recordedAt) === '오늘');
+  const todayStateLabel = todaySymptomRecord
+    ? OVERALL_STATE_OPTIONS.find((o) => o.id === todaySymptomRecord.state)?.label
+    : undefined;
+
   return (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
       <ThemedView
@@ -158,11 +163,11 @@ export default function RecordScreen() {
         <ThemedView type="surfaceCard" style={styles.statusCard}>
           <View style={styles.statusTexts}>
             <ThemedText type="bodyS" themeColor="textPrimary">
-              오늘은 아직 상태를 기록하지 않았어요.
+              {todayStateLabel ? `오늘 상태 · ${todayStateLabel}` : '오늘은 아직 상태를 기록하지 않았어요.'}
             </ThemedText>
             <Pressable onPress={() => router.push('/symptom')}>
               <ThemedText type="label" themeColor="brandText">
-                지금 상태 남기기
+                {todayStateLabel ? '기록 다시 하기' : '지금 상태 남기기'}
               </ThemedText>
             </Pressable>
           </View>

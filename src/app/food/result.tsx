@@ -10,10 +10,12 @@ import { IngredientChip } from '@/components/food/IngredientChip';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useTheme } from '@/hooks/use-theme';
+import { useMoruData } from '@/hooks/useMoruData';
 import { Spacing } from '@/constants/theme';
 import * as api from '@/services/api';
 import {
   PORTION_OPTIONS,
+  type FoodInputMethod,
   type Ingredient,
   type MealApiMethod,
   type MealApiPortion,
@@ -38,6 +40,13 @@ const PORTION_API_MAP: Record<Portion, MealApiPortion> = {
 /** POST /meals 의 portion 은 필수값이다 — 사용자가 직접 고르지 않았을 때만 이 값으로 채운다 */
 const DEFAULT_PORTION: Portion = 'normal';
 
+/** 서버 전송용 method('text') → 로컬 FoodRecord.inputMethod('manual') 매핑 */
+const METHOD_TO_INPUT_METHOD: Record<MealApiMethod, FoodInputMethod> = {
+  photo: 'photo',
+  search: 'search',
+  text: 'manual',
+};
+
 /**
  * D2 음식 확인 · 재료 확인.
  * 사진(POST /meals/identify-photo)/텍스트(POST /meals/identify)로 추정된 음식의 재료를
@@ -51,6 +60,7 @@ export default function FoodResultScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
+  const { addFoodRecord } = useMoruData();
   // photoUri: 카메라(D1)에서 촬영한 사진, foodName/mode: H1(메뉴 검색/직접 입력)에서 전달
   // food_id: H1 suggestion(screen="D2")에서 이미 확인된 food_id 를 전달받았을 때만 온다
   const { photoUri, foodName, mode, food_id } = useLocalSearchParams<{
@@ -146,10 +156,24 @@ export default function FoodResultScreen() {
         custom_ingredients: customNames,
       });
 
-      const ingredientNames = selectedIds
-        .map((id) => allIngredients.find((ingredient) => ingredient.id === id)?.name)
-        .filter((name): name is string => Boolean(name))
-        .join(',');
+      const selectedIngredients = selectedIds
+        .map((id) => allIngredients.find((ingredient) => ingredient.id === id))
+        .filter((ingredient): ingredient is Ingredient => Boolean(ingredient));
+
+      // 최근 기록(기록 탭) 표시용 — 서버 저장과 별개로 로컬에도 남겨둔다
+      addFoodRecord({
+        id: `food-${result.meal_id}`,
+        food: {
+          id: resolvedFoodId ? String(resolvedFoodId) : `food-${result.meal_id}`,
+          name: identify.food_name,
+          ingredients: selectedIngredients,
+        },
+        eatenAt,
+        inputMethod: METHOD_TO_INPUT_METHOD[method],
+        portion: portion ?? DEFAULT_PORTION,
+      });
+
+      const ingredientNames = selectedIngredients.map((ingredient) => ingredient.name).join(',');
 
       const forwardParams = {
         meal_id: String(result.meal_id),

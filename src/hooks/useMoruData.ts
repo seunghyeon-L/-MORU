@@ -149,11 +149,17 @@ export function useMoruData() {
     setState({ symptomRecords: [saved, ...state.symptomRecords] });
   }, []);
 
+  /** D2에서 POST /meals 성공 직후 호출 — 최근 기록(기록 탭) 표시용으로 로컬에도 남겨둔다 */
+  const addFoodRecord = useCallback((record: FoodRecord) => {
+    setState({ foodRecords: [record, ...state.foodRecords] });
+  }, []);
+
   return {
     ...snapshot,
     updateOnboarding,
     resetOnboarding,
     completeOnboarding,
     addSymptomRecord,
+    addFoodRecord,
   };
 }

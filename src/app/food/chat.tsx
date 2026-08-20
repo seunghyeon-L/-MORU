@@ -53,8 +53,11 @@ const STATIC_PROMPTS: StaticPrompt[] = [
  * 계약에 없어 화면은 항상 빈 대화로 시작한다. session_id 를 들고 있다가 다음 전송에
  * 그대로 실어 보내면 서버가 같은 대화로 이어준다.
  *
- * 응답의 suggestions(screen="D2"|"H4")를 탭하면 서버가 준 food_id/food_name 을 그대로
- * 다음 화면에 전달한다 — 답변 텍스트에서 음식 이름을 추출해 food_id 를 만들지 않는다.
+ * D1 바텀시트(메뉴 검색/직접 입력, mode=search|manual)로 들어온 "음식 기록용" 대화에서만
+ * suggestions(screen="D2"|"H4") 탭이 화면 이동을 일으킨다 — 서버가 준 food_id/food_name 을
+ * 그대로 다음 화면에 전달하며, 답변 텍스트에서 음식 이름을 추출해 food_id 를 만들지 않는다.
+ * 바텀시트를 거치지 않은 일반 "AI와 대화하기"는 대체 레시피/성분 대체/개인화 추천을 대화로만
+ * 응답하는 기능이라, 뒤로가기를 누르기 전까지 어떤 이유로도 화면을 벗어나지 않는다.
  * blocked:true 면 suggestions 가 오지 않으므로 별도 분기 없이 자연히 아무것도 뜨지 않는다.
  */
 export default function FoodChatScreen() {
@@ -167,7 +170,9 @@ export default function FoodChatScreen() {
                 <SelectionCard
                   key={`${suggestion.screen}-${index}`}
                   title={suggestion.label}
-                  onPress={() => handleSuggestionPress(suggestion)}
+                  // 바텀시트(메뉴 검색/직접 입력)로 들어온 기록용 대화에서만 탭으로 화면 이동한다.
+                  // 일반 "AI와 대화하기"는 뒤로가기 전까지 대화창에 머물러야 해서 탭해도 이동하지 않는다.
+                  onPress={isFoodEntry ? () => handleSuggestionPress(suggestion) : undefined}
                 />
               ))}
             </View>
