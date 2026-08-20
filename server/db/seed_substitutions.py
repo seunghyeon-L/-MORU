@@ -63,9 +63,14 @@ MENU_ALTERNATIVES = {
         ("맑은 순두부탕", "자극적인 양념 없이 담백해요.", 1),
         ("된장찌개", "매운 기 없이 구수해요.", 2),
     ],
+    # ⚠️ 칼국수·우동에서 바꿨다.
+    #    셋 다 밀 기반이라 프럭탄 급원이 그대로 남아서,
+    #    계산해보면 오히려 라면(1.75g)보다 높게 나왔다 (칼국수 2.67 / 우동 2.19).
+    #    "대체안" 이라면서 더 높은 걸 권하면 안 된다.
+    #    쌀 기반으로 바꾸니 1/10 수준이 된다.
     "라면": [
-        ("칼국수", "맵지 않고 부드러워요.", 1),
-        ("우동", "자극이 적은 국물이에요.", 2),
+        ("떡국", "쌀떡이라 부담이 덜해요.", 1),
+        ("쌀국수", "밀 대신 쌀로 만든 면이에요.", 2),
     ],
     "떡볶이": [
         ("간장떡볶이", "고춧가루·고추장 없이 매운 자극이 적어요.", 1),
@@ -138,9 +143,16 @@ def seed_menu_alternatives(cur):
         if fid is None:
             print(f"  ⚠ 음식 마스터에 없어 건너뜀: {food_name}")
             continue
-        cur.execute("SELECT count(*) FROM menu_alternatives WHERE food_id=%s", (fid,))
-        if cur.fetchone()[0] > 0:
-            continue
+        # 이 음식의 기존 대체 메뉴를 지우고 다시 넣는다.
+        #
+        # 전에는 "이미 있으면 건너뛰기" 였는데, 그러면 위 목록을 고쳐도
+        # 재실행에 반영되지 않는다. 실제로 라면 대체안을 바꿨는데
+        # 아무 일도 안 일어났다. 이 파일이 원본이 되려면 갱신돼야 한다.
+        #
+        # menu_alternatives 는 사용자 데이터가 아니라 마스터라 지워도 안전하다.
+        # (저장한 추천은 saved_recommendations 에 ref_id 로 남는다 —
+        #  가리키던 행이 사라지면 G 화면에서 조용히 빠진다)
+        cur.execute("DELETE FROM menu_alternatives WHERE food_id=%s", (fid,))
         for (alt_name, why, rank) in rows:
             cur.execute(
                 """INSERT INTO menu_alternatives (food_id, alt_name, why, rank)
