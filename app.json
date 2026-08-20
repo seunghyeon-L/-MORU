@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "moru",
-    "slug": "moru",
+    "slug": "seunghyeon-l",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -57,8 +57,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "f76a9e04-2e9a-466a-939d-014e69da3d9a"
+        "projectId": "ec6912b3-31aa-4b0e-89eb-7ce4623ca205"
       }
-    }
+    },
+    "owner": "seunghyeon-ls-team"
   }
 }
