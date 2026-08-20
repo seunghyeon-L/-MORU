@@ -93,11 +93,26 @@ def view(db: Session, user_id: int) -> dict:
         if rows:
             sections.append({"status": status, "title": title, "items": rows})
 
+    # 되찾은 게 없다고 "아직 시작 전" 이라고 하면 안 된다.
+    #
+    # 도전을 세 번 다 하고 "확인된 후보" 로 저장된 사람도
+    # safe 가 0 이라는 이유로 "아직 시작 전이에요" 를 봤다.
+    # 사흘 동안 세 번을 시도한 사람에게 시작도 안 했다고 말하는 셈이다.
+    # 결과가 '되찾음' 이 아니어도 확인한 것은 확인한 것이다.
+    checked = recovered + len(by["candidate"])
+    if recovered:
+        headline = f"처음보다 {recovered}가지를 되찾았어요"
+        sub = f"피하던 음식 {total}가지 중 {recovered}가지를 다시 드실 수 있게 됐어요."
+    elif checked:
+        headline = "하나씩 확인하고 있어요"
+        sub = f"{checked}가지를 확인해봤어요. 나머지도 천천히 해봐요."
+    else:
+        headline = "아직 시작 전이에요"
+        sub = "하나씩 천천히 넓혀가요."
+
     return {
-        "headline": f"처음보다 {recovered}가지를 되찾았어요" if recovered
-                    else "아직 시작 전이에요",
-        "sub": (f"피하던 음식 {total}가지 중 {recovered}가지를 다시 드실 수 있게 됐어요."
-                if recovered else "하나씩 천천히 넓혀가요."),
+        "headline": headline,
+        "sub": sub,
         "sections": sections,
         "saved_recommendations": _saved(db, user_id),
     }
