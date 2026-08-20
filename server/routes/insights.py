@@ -35,7 +35,7 @@ router = APIRouter(tags=["홈·분석"])
         ],
     }),
 )
-async def home_view(dev: str = Depends(device_id), db: Session = Depends(get_db)):
+def home_view(dev: str = Depends(device_id), db: Session = Depends(get_db)):
     """카드는 배열이다. 개수도 순서도 서버가 정한다.
 
     프론트는 type 별 렌더러만 만들고 반복해서 그린다.
@@ -55,7 +55,7 @@ async def home_view(dev: str = Depends(device_id), db: Session = Depends(get_db)
     summary="홈 도전 제안 카드의 '나중에'",
     responses=ex({"ok": True, "days": 14}),
 )
-async def snooze(body: SnoozeIn, dev: str = Depends(device_id),
+def snooze(body: SnoozeIn, dev: str = Depends(device_id),
                  db: Session = Depends(get_db)):
     """거절이 아니라 미루기다. 2주 뒤에 다시 제안된다."""
     u = users.get_or_create(db, dev)
@@ -86,7 +86,7 @@ async def snooze(body: SnoozeIn, dev: str = Depends(device_id),
         },
     }),
 )
-async def patterns_view(dev: str = Depends(device_id), db: Session = Depends(get_db)):
+def patterns_view(dev: str = Depends(device_id), db: Session = Depends(get_db)):
     """verdict.title 은 항상 유보형이다.
 
     "양파가 원인입니다" 같은 문장은 서버가 절대 만들지 않는다 (절대 원칙 ①).
@@ -115,7 +115,7 @@ async def patterns_view(dev: str = Depends(device_id), db: Session = Depends(get
         "saved_recommendations": [{"kind": "recipe", "ref_id": 3, "title": "속 편한 녹차라떼"}],
     }),
 )
-async def mytable_view(dev: str = Depends(device_id), db: Session = Depends(get_db)):
+def mytable_view(dev: str = Depends(device_id), db: Session = Depends(get_db)):
     """headline 의 개수는 되찾은 개수다.
 
     제한이 아니라 확장을 세기 때문에 원칙 ② 의 "점수" 가 아니다.

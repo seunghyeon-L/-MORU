@@ -147,7 +147,7 @@ def _resolve(db: Session, extracted: dict) -> dict:
     summary="D1→D2 · 텍스트로 재료 식별",
     responses=ex(_IDENTIFY_EXAMPLE),
 )
-async def identify_text(body: IdentifyIn, dev: str = Depends(device_id), db: Session = Depends(get_db)):
+def identify_text(body: IdentifyIn, dev: str = Depends(device_id), db: Session = Depends(get_db)):
     """마스터에 없는 재료는 지어내지 않는다. 못 찾으면 ingredients 가 빈 배열로 온다."""
     u = users.get_or_create(db, dev)
     r = llm.structured(
@@ -164,10 +164,10 @@ async def identify_text(body: IdentifyIn, dev: str = Depends(device_id), db: Ses
     summary="D1→D2 · 사진으로 재료 식별",
     responses=ex(_IDENTIFY_EXAMPLE),
 )
-async def identify_photo(photo: UploadFile = File(...), dev: str = Depends(device_id),
+def identify_photo(photo: UploadFile = File(...), dev: str = Depends(device_id),
                          db: Session = Depends(get_db)):
     u = users.get_or_create(db, dev)
-    raw = await photo.read()
+    raw = photo.file.read()
     if not raw:
         return _IDENTIFY_EMPTY
 
@@ -190,7 +190,7 @@ async def identify_photo(photo: UploadFile = File(...), dev: str = Depends(devic
     summary="D2 확정 → D4 기록 완료",
     responses=ex({"meal_id": 91, "has_insight": True}),
 )
-async def create_meal(body: MealIn, dev: str = Depends(device_id), db: Session = Depends(get_db)):
+def create_meal(body: MealIn, dev: str = Depends(device_id), db: Session = Depends(get_db)):
     """has_insight 가 false 면 D3 를 건너뛰고 바로 D4 로 간다."""
     u = users.get_or_create(db, dev)
     meal = Meal(
@@ -246,7 +246,7 @@ async def create_meal(body: MealIn, dev: str = Depends(device_id), db: Session =
         ],
     }),
 )
-async def meal_insight(meal_id: int, dev: str = Depends(device_id),
+def meal_insight(meal_id: int, dev: str = Depends(device_id),
                        db: Session = Depends(get_db)):
     """caveat 은 절대 생략하지 않는다.
 
@@ -273,7 +273,7 @@ async def meal_insight(meal_id: int, dev: str = Depends(device_id),
         "notice": None,
     }),
 )
-async def create_symptom(
+def create_symptom(
     body: SymptomIn, dev: str = Depends(device_id), db: Session = Depends(get_db),
 ):
     """red_flag 가 true 면 저장은 하되 프론트는 즉시 B1x 병원 안내로 보낸다.
@@ -327,7 +327,7 @@ async def create_symptom(
     summary="후속 푸시를 눌렀을 때",
     responses=ex({"ok": True}),
 )
-async def resolve_symptom(log_id: int, body: ResolveIn, dev: str = Depends(device_id),
+def resolve_symptom(log_id: int, body: ResolveIn, dev: str = Depends(device_id),
                           db: Session = Depends(get_db)):
     u = users.get_or_create(db, dev)
     log = db.query(SymptomLog).filter(
@@ -371,7 +371,7 @@ KST = timezone(timedelta(hours=9))
         }],
     }),
 )
-async def records(days: int = 14, dev: str = Depends(device_id),
+def records(days: int = 14, dev: str = Depends(device_id),
                   db: Session = Depends(get_db)):
     """기록 메인 화면이 쓰는 목록.
 

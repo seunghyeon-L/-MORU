@@ -48,7 +48,7 @@ def _load(db: Session, dev: str, cid: int) -> Challenge:
         "steps": STEPS, "evidence": EVIDENCE,
     }),
 )
-async def suggestion(response: Response, dev: str = Depends(device_id),
+def suggestion(response: Response, dev: str = Depends(device_id),
                      db: Session = Depends(get_db)):
     """제안할 게 없으면 204. 알레르기·셀리악 항목은 절대 나오지 않는다.
 
@@ -84,7 +84,7 @@ async def suggestion(response: Response, dev: str = Depends(device_id),
     responses=ex({"challenge_id": 7, "status": "eliminating",
                   "eliminate_until": "2026-08-22"}),
 )
-async def create(body: ChallengeIn, dev: str = Depends(device_id),
+def create(body: ChallengeIn, dev: str = Depends(device_id),
                  db: Session = Depends(get_db)):
     """쓰기다. F2 화면에 들어왔다는 이유로 부르면 안 된다.
 
@@ -92,7 +92,11 @@ async def create(body: ChallengeIn, dev: str = Depends(device_id),
     GET /ingredients/{id}/contains 로 따로 읽는다.
     """
     u = users.get_or_create(db, dev)
-    ch = svc.create(db, u.id, body.ingredient_id, body.elimination_days)
+    try:
+        ch = svc.create(db, u.id, body.ingredient_id, body.elimination_days)
+    except ValueError as e:
+        # SF-02 — 알레르기·셀리악 재료는 도전을 만들 수 없다
+        raise HTTPException(409, {"code": "CHALLENGE_BLOCKED", "message": str(e)})
     return {
         "challenge_id": ch.id,
         "status": ch.status,
@@ -111,7 +115,7 @@ async def create(body: ChallengeIn, dev: str = Depends(device_id),
         "reassurance": REASSURANCE,
     }),
 )
-async def detail(challenge_id: int, dev: str = Depends(device_id),
+def detail(challenge_id: int, dev: str = Depends(device_id),
                  db: Session = Depends(get_db)):
     """available_days 는 busy_days 를 뺀 결과다. 프론트는 준 날짜만 활성화한다.
 
@@ -161,7 +165,7 @@ async def detail(challenge_id: int, dev: str = Depends(device_id),
     summary="시도 1회 결과 기록",
     responses=ex({"ok": True, "next_seq": 3, "finished": False}),
 )
-async def attempt(challenge_id: int, seq: int, body: AttemptIn,
+def attempt(challenge_id: int, seq: int, body: AttemptIn,
                   dev: str = Depends(device_id), db: Session = Depends(get_db)):
     """finished 가 true 면 F4 로 이동한다."""
     ch = _load(db, dev, challenge_id)
@@ -181,7 +185,7 @@ async def attempt(challenge_id: int, seq: int, body: AttemptIn,
         "grade": "reduce_amount", "grade_label": "확정은 아니에요",
     }),
 )
-async def result(challenge_id: int, dev: str = Depends(device_id),
+def result(challenge_id: int, dev: str = Depends(device_id),
                  db: Session = Depends(get_db)):
     """grade 는 등급 문자열이다. 허용량을 g 숫자로 주지 않는다.
 
@@ -197,14 +201,24 @@ async def result(challenge_id: int, dev: str = Depends(device_id),
             .filter(ChallengeAttempt.challenge_id == ch.id)
             .order_by(ChallengeAttempt.seq).all())
     hits = sum(1 for a in rows if a.result == "reaction")
+    # 건너뛴 회차를 "괜찮았다" 로 세면 안 된다.
+    # 두 번을 건너뛰고 한 번만 괜찮았는데 "세 번 다 괜찮았어요" 라고 말하던 자리다.
+    done = sum(1 for a in rows if a.result in ("reaction", "no_reaction"))
+    skipped = sum(1 for a in rows if a.result == "skipped")
     info = svc.GRADE_TEXT[ch.result_grade]
 
     LABEL = {"reaction": "불편함 있었어요", "no_reaction": "괜찮았어요",
              "skipped": "건너뛰었어요", "pending": "—"}
     return {
-        "ratio": f"{hits}/3",
-        "headline": (f"{name}, 세 번 중 {hits}번 반응이 있었어요" if hits
-                     else f"{name}, 세 번 다 괜찮았어요"),
+        "ratio": f"{hits}/{done}" if done else "0/0",
+        # 3번을 다 못 채웠으면 결론을 말하지 않는다.
+        # 판정(grade)은 이미 recheck_later 로 나오는데
+        # 헤드라인만 "다 괜찮았어요" 라고 해서 서로 어긋났다.
+        "headline": (
+            f"{name}, 아직 판단하기 어려워요 (해본 {done}번 · 건너뛴 {skipped}번)"
+            if done < 3 else
+            f"{name}, 세 번 중 {hits}번 반응이 있었어요" if hits
+            else f"{name}, 세 번 다 괜찮았어요"),
         "attempts": [{
             "seq": a.seq,
             "date": a.tested_at.strftime("%m월 %d일") if a.tested_at else "—",
@@ -221,7 +235,7 @@ async def result(challenge_id: int, dev: str = Depends(device_id),
     summary="F4 → G '나의 식탁에 저장하기'",
     responses=ex({"ok": True, "moved_to": "candidate"}),
 )
-async def save(challenge_id: int, dev: str = Depends(device_id),
+def save(challenge_id: int, dev: str = Depends(device_id),
                db: Session = Depends(get_db)):
     """my_table_items 상태 전이는 오직 여기서만 일어난다 (데이터 규칙 8)."""
     ch = _load(db, dev, challenge_id)

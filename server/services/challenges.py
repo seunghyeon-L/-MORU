@@ -17,7 +17,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
-from models import BusyDay, Challenge, ChallengeAttempt, Ingredient, MyTableItem
+from models import BusyDay, Challenge, ChallengeAttempt, Ingredient, MyTableItem, User
 
 KST = timezone(timedelta(hours=9))
 
@@ -39,6 +39,8 @@ def today() -> date:
 
 def create(db: Session, user_id: int, ingredient_id: int, elimination_days: int) -> Challenge:
     """F2 확정. 제거 기간을 잡고 시도 3칸을 미리 만들어둔다."""
+    if reason := blocked_reason(db, user_id, ingredient_id):
+        raise ValueError(reason)
     start = today()
     ch = Challenge(
         user_id=user_id, ingredient_id=ingredient_id, status=ELIMINATING,
@@ -224,6 +226,34 @@ def hard_stop_reason(db: Session, user_id: int) -> str | None:
     return None
 
 
+def blocked_reason(db: Session, user_id: int, ingredient_id: int) -> str | None:
+    """알레르기·셀리악 재료면 이유를 돌려준다. 아니면 None.
+
+    온보딩에서 이미 나의 식탁에 안 넣고 있지만(services/mytable.py),
+    그건 **제안** 을 막는 것뿐이다.
+    POST /challenges 는 ingredient_id 를 그대로 받기 때문에
+    검색·직접 선택 같은 다른 경로로 들어오면 그대로 통과했다.
+    알레르기는 양과 무관하게 위험해서 "적게 먹어보기" 라는 제안 자체가
+    있으면 안 된다 (SF-02). 그래서 실제로 만드는 지점에서 한 번 더 막는다.
+    """
+    from models import UserAllergy
+    ing = db.get(Ingredient, ingredient_id)
+    if ing is None:
+        return None
+    names = {ing.name, *(ing.aliases or [])}
+
+    for a in db.query(UserAllergy).filter(UserAllergy.user_id == user_id):
+        # 칩 라벨("우유·유제품")과 재료 이름("우유")은 서로를 부분 포함한다
+        if any(n and (n in a.label or a.label in n) for n in names):
+            return f"알레르기로 등록하신 항목이에요 ({a.label})"
+
+    u = db.get(User, user_id)
+    if u is not None and u.celiac == "yes":
+        if any(k in n for n in names for k in ("밀", "글루텐", "보리", "호밀")):
+            return "셀리악병에서는 글루텐을 시도해보시면 안 됩니다"
+    return None
+
+
 def next_candidate(db: Session, user_id: int) -> MyTableItem | None:
     """다음에 제안할 항목.
 
@@ -238,11 +268,15 @@ def next_candidate(db: Session, user_id: int) -> MyTableItem | None:
         return None               # 진행 중인 도전이 있으면 새로 제안하지 않는다
 
     from sqlalchemy import or_
-    return (db.query(MyTableItem)
+    rows = (db.query(MyTableItem)
             .filter(MyTableItem.user_id == user_id,
                     MyTableItem.status == "to_try",
                     MyTableItem.ingredient_id.isnot(None),
                     # 홈에서 "나중에" 를 누른 건 기한이 지나야 다시 나온다
                     or_(MyTableItem.snoozed_until.is_(None),
                         MyTableItem.snoozed_until <= today()))
-            .order_by(MyTableItem.updated_at).first())
+            .order_by(MyTableItem.updated_at).all())
+    for it in rows:
+        if not blocked_reason(db, user_id, it.ingredient_id):
+            return it
+    return None

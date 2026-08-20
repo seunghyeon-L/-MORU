@@ -28,7 +28,7 @@ router = APIRouter(tags=["AI"])
         "suggestions": [],
     }),
 )
-async def send(body: ChatIn, dev: str = Depends(device_id), db: Session = Depends(get_db)):
+def send(body: ChatIn, dev: str = Depends(device_id), db: Session = Depends(get_db)):
     """blocked 가 true 여도 프론트는 답변을 그대로 띄우고 후속 입력을 막지 않는다.
 
     계속 막는 건 서버가 한다. 프론트가 자체 판단으로 차단하지 않는다.

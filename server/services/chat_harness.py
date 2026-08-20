@@ -26,8 +26,9 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
-from models import Challenge, Meal, MyTableItem, User
+from models import Challenge, Meal, MyTableItem, SymptomLog, User
 from services import challenges, llm, patterns
+from services.text import w
 
 KST = timezone(timedelta(hours=9))
 
@@ -69,14 +70,42 @@ RESTRICTION_REPLY = (
 # 놓치는 것보다 과하게 잡는 게 낫다.
 
 STOOL = re.compile(r"변(?!비)|대변|똥|응가|화장실|배변|휴지")
-ALARM_COLOR = re.compile(r"피|혈|빨갛|빨간|빨개|붉|까맣|까만|까매|검|시커|타르")
+
+# ★ 색·피 단어는 **단어 단위로** 잡는다.
+#   전에는 그냥 "피" 였는데 커'피' · '피'자 · '피'하다 · '피'클 · '피'망에 전부 걸렸다.
+#   "커피 마시면 화장실을 자주 가요" 가 응급 안내로 튕겨나갔다.
+#   커피와 피자는 이 앱이 가장 흔하게 받는 질문이다. 과잉 차단의 대가가 너무 크다.
+ALARM_COLOR = re.compile(
+    r"혈(?!당)"                       # 혈변·혈액 (혈당은 제외)
+    r"|(^|[\s,.!?~])피[가를는]?([\s,.!?~]|$)"   # 홀로 선 '피'
+    r"|피\s*(가|를)?\s*(섞|묻|나|비침)"
+    r"|빨갛|빨간|빨개|붉"
+    r"|까맣|까만|까매|검은|검게|시커|타르색"
+)
 
 RED_FLAGS = re.compile(
     r"혈변|흑색변|자장변"
     r"|체중\s*(감소|줄|빠)|살이\s*(빠|많이 빠)|kg\s*(줄|빠)"
-    r"|열이\s*(나|안\s*떨어)|고열|발열|미열이\s*계속"
-    r"|토\s*(했|해요|하고)|구토|게워|울렁"
+    # '열이 나는 음식' 같은 관형형은 제외한다
+    r"|열이\s*(나요|나고|난다|나서|계속|안\s*떨어)|고열|발열|미열이\s*계속"
+    # '토마토 하고' 에 걸리지 않도록 앞에 '마' 가 오면 제외
+    r"|(?<!마)토\s*(했|해요|하고|할\s*것)|구토|게워|울렁"
     r"|빈혈|어지러워서\s*쓰러|쓰러졌"
+)
+
+# 위기 신호 — 소화기 문제가 아니다. 별도 안내로 보낸다.
+# IBS 환자군은 우울·불안 동반률이 높다. "죽고 싶다" 에 소화기내과를 안내하는 건
+# 무시에 가깝고 사용자를 더 고립시킨다.
+CRISIS = re.compile(
+    r"죽고\s*싶|죽어\s*버리|자살|목숨을\s*끊|사라지고\s*싶"
+    r"|살기\s*싫|사는\s*게\s*의미|다\s*그만두고\s*싶|자해"
+)
+CRISIS_REPLY = (
+    "많이 힘드셨겠어요. 그 이야기는 제가 도와드릴 수 있는 범위를 넘어서요.\n\n"
+    "지금 많이 힘드시다면 혼자 견디지 마시고 이야기 나눠보세요.\n"
+    "· 자살예방 상담전화 109 (24시간)\n"
+    "· 정신건강 상담전화 1577-0199\n\n"
+    "가까운 분에게 지금 연락해보시는 것도 도움이 됩니다."
 )
 
 
@@ -101,7 +130,8 @@ KIND_SCHEMA = {
     "type": "object",
     "properties": {
         "kind": {"type": "string",
-                 "enum": ["record_query", "food_question", "medical_question", "other"]},
+                 "enum": ["record_query", "food_question", "symptom_report",
+                          "medical_question", "other"]},
         "confident": {"type": "boolean"},
     },
     "required": ["kind", "confident"],
@@ -116,7 +146,13 @@ record_query      본인의 기록에 대한 질문
                   예) 지난주에 뭐 먹었지, 양파 몇 번 시도했더라
 food_question     특정 음식을 먹어도 되는지, 어떻게 먹으면 좋을지
                   예) 제육볶음 먹어도 될까요, 우유 대신 뭐 마시죠
-medical_question  증상의 원인·병명·약·검사·치료에 대한 질문
+symptom_report    증상이나 있었던 일을 **서술만** 하고, 원인·병명·약을 묻지 않는 경우
+                  예) 배가 아파요, 어제 우유 먹고 화장실 자주 갔어요,
+                      오늘은 좀 괜찮았어요, 요즘 속이 안 좋네요
+                  이 앱은 배가 아픈 사람이 쓰는 앱이다.
+                  **증상을 말했다는 이유만으로 진료 질문으로 보내지 마라.**
+                  "왜", "무슨 병", "약", "검사" 가 없으면 여기다.
+medical_question  증상의 **원인·병명·약·검사·치료를 묻는** 질문
                   예) 저 IBS인가요, 왜 아픈 걸까요, 약 먹어야 하나요,
                       이거 큰 병 아닐까요, 병원 가야 하나요
                   **영양제·보충제·유산균·프로바이오틱스 추천도 여기다.**
@@ -142,6 +178,7 @@ true 로 해도 되는 경우
   예) "제가 지금 뭘 피하고 있죠"     → record_query, true
       "우유 대신 뭘 마시죠"          → food_question, true
       "안녕하세요"                   → other, true
+      "어제 배가 아팠어요"           → symptom_report, true
 
 record_query 나 food_question 이 분명한데 습관적으로 false 를 주지 마라.
 그러면 앱이 아무 질문에도 답하지 못한다.
@@ -179,6 +216,9 @@ ANSWER_SYSTEM = """너는 MORU 라는 앱의 도우미다. 의료인이 아니�
 - "이 음식이 원인입니다" 같은 단정을 하지 않는다.
   기록은 관찰이지 인과가 아니다
 - 증상의 원인을 설명하지 않는다
+- **점수·등급·연속 기록·"잘 지키셨어요" 같은 칭찬을 절대 하지 않는다.**
+  음식을 피한 것을 성취로 다루면 안 된다. 물어봐도 답하지 않는다.
+  이 앱은 먹을 수 있는 것을 늘리는 앱이지, 안 먹은 것을 칭찬하는 앱이 아니다
 
 하는 것
 - 기록에 있는 횟수와 사실만 말한다
@@ -233,10 +273,26 @@ def build_context(db: Session, user: User) -> str:
         lines.append(f"- 최근 일주일 실제로 먹은 것: {eaten}")
 
     # 관찰 — 말해도 되는 것만. patterns 가 근거 부족한 건 이미 걸러준다.
+    # ★ 교란 요인을 반드시 함께 넣는다.
+    #   전에는 관찰만 주고 시스템 프롬프트로 "다른 요인도 말해라" 라고만 했다.
+    #   데이터를 안 주니 LLM 이 지킬 방법이 없었고, 실제로 통과한 답변에서
+    #   교란 요인을 병기한 경우가 한 건도 없었다. 절대 원칙 ① 위반이다.
     for s in patterns.ingredient_stats(db, user.id):
         if s["speakable"]:
-            lines.append(f"- 관찰: {s['name']}이 든 식사 {s['meals']}번 중 "
-                         f"{s['hits']}번 뒤에 불편함 기록 (인과는 확인되지 않음)")
+            cos = patterns.cofactors(db, s["hit_logs"])
+            tail = (" / 그날 함께 있었던 것: "
+                    + ", ".join(f"{c['label']} {c['count']}번" for c in cos)) if cos else ""
+            lines.append(f"- 관찰: {w(s['name'], '이')} 든 식사 {s['meals']}번 중 "
+                         f"{s['hits']}번 뒤에 불편함 기록 (인과는 확인되지 않음){tail}")
+
+    # 사용자가 남긴 상황 요인 전체 — "제 기록에 수면 정보 있나요" 에 없다고 답하던 것
+    all_ctx = patterns.cofactors(db, [
+        r.id for r in db.query(SymptomLog)
+        .filter(SymptomLog.user_id == user.id,
+                SymptomLog.onset_at >= now - timedelta(days=30))])
+    if all_ctx:
+        lines.append("- 사용자가 증상과 함께 남긴 상황: "
+                     + ", ".join(f"{c['label']} {c['count']}번" for c in all_ctx))
 
     return "\n".join(lines) if lines else "(기록 없음)"
 
@@ -264,6 +320,22 @@ ASSERTIONS = re.compile(
     r"|진단|의심됩니다|의심돼요|가능성이 높습니다|~일 겁니다"
 )
 
+# 절대 원칙 ② — 제한을 보상하면 섭식장애 위험을 키운다.
+# LLM 은 "100점", "며칠 연속 성공", "잘 지키셨어요" 를 자연스럽게 뱉는다.
+# 앱의 다른 화면이 전부 피해 온 것을 챗봇이 되살리면 안 된다.
+REWARD = re.compile(
+    r"\d+\s*점|점수|만점|백점"
+    r"|연속\s*(으로)?\s*(성공|달성|지키|피하|유지)"
+    r"|스트릭|streak|기록\s*경신"
+    r"|잘\s*(지키|참|버티|실천|해내)|훌륭|대단|칭찬|성공하셨"
+    r"|목표\s*달성|완벽하게"
+)
+
+SYMPTOM_REPLY = (
+    "말씀해주셔서 고마워요. 기록해두시면 나중에 어떤 상황에서 그랬는지 같이 볼 수 있어요.\n"
+    "홈에서 '기록하기' 로 남겨두시면 좋겠습니다.\n\n"
+    "증상이 평소와 다르거나 오래 간다면 진료를 받아보시는 게 좋습니다.")
+
 MAX_LEN = 400
 
 
@@ -276,6 +348,8 @@ def violations(reply: str) -> list[str]:
         bad.append(f"약·검사·치료를 언급했다: '{m.group()}'")
     if m := ASSERTIONS.search(reply):
         bad.append(f"원인을 단정했다: '{m.group()}'")
+    if m := REWARD.search(reply):
+        bad.append(f"제한을 보상했다(점수·연속·칭찬): '{m.group()}'")
     if len(reply) > MAX_LEN:
         bad.append(f"너무 길다 ({len(reply)}자, {MAX_LEN}자 이내)")
     return bad
@@ -309,6 +383,10 @@ def food_suggestions(db: Session, text: str) -> list[dict]:
 def answer(db: Session, user: User, text: str) -> dict:
     """H1 한 턴. 반환값이 그대로 API 응답이 된다."""
 
+    # ── 1층-0. 위기 신호. 무엇보다 먼저 본다 ──
+    if CRISIS.search(text):
+        return _out(CRISIS_REPLY, blocked=True, reason="crisis", llm_called=False)
+
     # ── 1층-a. 레드플래그. 분류조차 하지 않는다 ──
     if is_red_flag(text):
         return _out(RED_FLAG_REPLY, blocked=True, reason="red_flag", llm_called=False)
@@ -320,6 +398,12 @@ def answer(db: Session, user: User, text: str) -> dict:
 
     # ── 1층-b. 유형 분류 ──
     kind, confident = classify(db, text, user.id)
+    if kind == "symptom_report":
+        # 원인을 묻지 않았으니 설명하지 않는다. 진료로도 보내지 않는다.
+        # 배가 아프다는 말에 "병원 가세요" 라고 답하면 IBS 앱이 성립하지 않는다.
+        # 진짜 위험 신호는 위에서 이미 걸러졌다.
+        return _out(SYMPTOM_REPLY, blocked=False, reason="symptom_report",
+                    llm_called=True)
     if kind == "medical_question":
         return _out(TO_HOSPITAL, blocked=True, reason="medical_question", llm_called=True)
     if not confident:

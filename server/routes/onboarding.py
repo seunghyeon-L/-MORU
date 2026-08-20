@@ -32,7 +32,7 @@ router = APIRouter(tags=["온보딩"])
         "none_label": "해당 없어요",
     }),
 )
-async def safety_questions():
+def safety_questions():
     """항목이 늘거나 문구가 바뀌어도 앱을 새로 배포하지 않아도 되게 서버가 준다."""
     return {
         "title": "해당되는 것이 있나요?",
@@ -54,7 +54,7 @@ async def safety_questions():
         "footer": "MORU는 질병을 진단하거나 치료하는 서비스가 아니에요.",
     }),
 )
-async def screen(body: SafetyIn, dev: str = Depends(device_id), db: Session = Depends(get_db)):
+def screen(body: SafetyIn, dev: str = Depends(device_id), db: Session = Depends(get_db)):
     """blocked 가 true 면 프론트는 B1x 로 보내고 온보딩을 끝낸다. 문구는 서버가 준다.
 
     cleared_by_doctor 로 통과한 경우에도 flags 는 채워져 저장된다.
@@ -87,7 +87,7 @@ async def screen(body: SafetyIn, dev: str = Depends(device_id), db: Session = De
     summary="B2·B3·B4 — 알레르기 · 피하는 음식 · 증상 문진",
     responses=ex({"user_id": 1, "onboarded": True}),
 )
-async def profile(body: ProfileIn, dev: str = Depends(device_id), db: Session = Depends(get_db)):
+def profile(body: ProfileIn, dev: str = Depends(device_id), db: Session = Depends(get_db)):
     """avoided_foods 는 그대로 나의 식탁의 avoiding 구획이 된다."""
     u = users.get_or_create(db, dev)
     if body.nickname:          # 안 보내면 기존 값을 지우지 않는다
@@ -117,7 +117,7 @@ async def profile(body: ProfileIn, dev: str = Depends(device_id), db: Session = 
     summary="앱 부팅 시 첫 호출",
     responses=ex({"user_id": 1, "nickname": "은솔", "onboarded": True, "blocked": False}),
 )
-async def me(dev: str = Depends(device_id), db: Session = Depends(get_db)):
+def me(dev: str = Depends(device_id), db: Session = Depends(get_db)):
     """onboarded=false 면 B1 로, blocked=true 면 B1x 로 보낸다."""
     u = users.get_or_create(db, dev)
     return {

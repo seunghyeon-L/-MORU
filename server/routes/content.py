@@ -28,7 +28,7 @@ router = APIRouter(tags=["대체안"])
         "contains": ["김치찌개", "제육볶음", "카레", "샌드위치", "샐러드"],
     }),
 )
-async def contains(ingredient_id: int, dev: str = Depends(device_id), db: Session = Depends(get_db)):
+def contains(ingredient_id: int, dev: str = Depends(device_id), db: Session = Depends(get_db)):
     """food_ingredients 를 재료로 역조회한다.
 
     F2 화면 진입 시 부른다. 도전을 만들지 않는다 —
@@ -69,7 +69,7 @@ async def contains(ingredient_id: int, dev: str = Depends(device_id), db: Sessio
         ],
     }),
 )
-async def alternatives(food_id: int, dev: str = Depends(device_id), db: Session = Depends(get_db)):
+def alternatives(food_id: int, dev: str = Depends(device_id), db: Session = Depends(get_db)):
     food = db.get(Food, food_id)
     if food is None:
         return {"food_name": "", "ingredients": [], "options": []}
@@ -150,7 +150,7 @@ async def alternatives(food_id: int, dev: str = Depends(device_id), db: Session 
         "has_more": True,
     }),
 )
-async def menu_alternatives(food_id: int, dev: str = Depends(device_id), db: Session = Depends(get_db)):
+def menu_alternatives(food_id: int, dev: str = Depends(device_id), db: Session = Depends(get_db)):
     food = db.get(Food, food_id)
     if food is None:
         return {"headline": "", "items": [], "has_more": False}
@@ -208,7 +208,7 @@ _SUBSTITUTION_TIPS = [
         "recipes": [{"recipe_id": 1, "title": "속 편한 녹차라떼", "screen": "H2"}],
     }),
 )
-async def substitutions(
+def substitutions(
     ingredient_ids: str = Query(..., examples=["12,15"]),
     dev: str = Depends(device_id),
     db: Session = Depends(get_db),
@@ -271,7 +271,7 @@ async def substitutions(
         "tip": "우유를 데울 때 끓이지 마세요. 60도 정도가 가장 부드러워요.",
     }),
 )
-async def recipe(recipe_id: int, dev: str = Depends(device_id), db: Session = Depends(get_db)):
+def recipe(recipe_id: int, dev: str = Depends(device_id), db: Session = Depends(get_db)):
     r = db.get(Recipe, recipe_id)
     if r is None:
         return {"title": "", "servings": None, "items": [], "tip": None}
@@ -297,7 +297,7 @@ async def recipe(recipe_id: int, dev: str = Depends(device_id), db: Session = De
     summary="추천 저장 — G '저장한 추천' 에 쌓인다",
     responses=ex({"ok": True}),
 )
-async def save(body: SaveIn, dev: str = Depends(device_id), db: Session = Depends(get_db)):
+def save(body: SaveIn, dev: str = Depends(device_id), db: Session = Depends(get_db)):
     u = users.get_or_create(db, dev)
     db.add(SavedRecommendation(user_id=u.id, kind=body.kind, ref_id=body.ref_id))
     db.commit()
