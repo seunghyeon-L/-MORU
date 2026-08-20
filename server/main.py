@@ -7,7 +7,9 @@
 프론트는 응답 형태가 확정됐다고 보고 붙이면 되고, 백엔드가 안쪽을 차례로 채운다.
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from routes import challenges, chat, content, insights, onboarding, records
@@ -46,3 +48,20 @@ def root():
 @app.get("/health", tags=["운영"])
 def health():
     return {"ok": True}
+
+@app.exception_handler(RequestValidationError)
+def _validation_error(request: Request, exc: RequestValidationError):
+    """검증 실패를 500 으로 만들지 않는다.
+
+    기본 핸들러는 잘못된 입력을 그대로 에러 본문에 담는데,
+    파일 업로드가 잘못 오면 그 안에 바이트가 들어가고
+    JSON 인코딩이 UnicodeDecodeError 로 터져 500 이 됐다.
+    앱에서 사진 업로드가 조금만 어긋나도 서버 오류로 보인다.
+    """
+    safe = [{"loc": [str(x) for x in e.get("loc", [])],
+             "msg": e.get("msg", ""), "type": e.get("type", "")}
+            for e in exc.errors()]
+    return JSONResponse(status_code=422,
+                        content={"code": "INVALID_REQUEST",
+                                 "message": "요청 형식이 올바르지 않아요",
+                                 "detail": safe})

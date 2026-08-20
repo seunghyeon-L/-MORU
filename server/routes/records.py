@@ -94,8 +94,33 @@ _IDENTIFY_SCHEMA = {
 
 _IDENTIFY_EMPTY = {
     "food_id": None, "food_name": "", "has_broth": False,
-    "ingredients": [], "confidence": "low",
+    "ingredients": [], "confidence": "low", "is_food": False,
 }
+
+_MIN_SIDE = 64          # 이보다 작으면 사람도 음식인지 못 알아본다
+_MIN_COLORS = 12        # 단색·2색 화면은 사진이 아니다
+
+
+def _too_little_to_see(raw: bytes) -> bool:
+    """사진이라고 부를 수 없는 이미지는 LLM 에 보내지 않는다.
+
+    1x1 흰 점을 보내면 모델이 "김치찌개" 라고 답하고
+    confidence 를 high 로 주기까지 했다. 재료 8개가 딸려 나왔다.
+    프롬프트로 "모르겠으면 모른다고 해라" 라고 써도 이건 막히지 않는다 —
+    입력에 정보가 없으면 모델은 가장 그럴듯한 것을 만들어낸다.
+    그래서 **부르기 전에** 코드로 거른다.
+    """
+    try:
+        img = Image.open(BytesIO(raw)).convert("RGB")
+    except Exception:                       # noqa: BLE001
+        return True
+    if min(img.size) < _MIN_SIDE:
+        return True
+    small = img.resize((64, 64))
+    colors = small.getcolors(maxcolors=64 * 64) or []
+    if len(colors) < _MIN_COLORS:
+        return True
+    return False
 
 _MAX_IMAGE_SIDE = 1024   # Vision 은 이 이상 키워봐야 인식률이 안 오르고 토큰만 늘어난다
 
@@ -139,6 +164,7 @@ def _resolve(db: Session, extracted: dict) -> dict:
         "ingredients": [{"id": i.id, "name": i.name, "checked": True} for i in matched],
         # 마스터 음식과 재료가 하나라도 맞으면 high, 둘 다 불확실하면 low.
         "confidence": "high" if (food is not None and matched) else "low",
+        "is_food": True,
     }
 
 
@@ -168,7 +194,7 @@ def identify_photo(photo: UploadFile = File(...), dev: str = Depends(device_id),
                          db: Session = Depends(get_db)):
     u = users.get_or_create(db, dev)
     raw = photo.file.read()
-    if not raw:
+    if not raw or _too_little_to_see(raw):
         return _IDENTIFY_EMPTY
 
     jpeg = _downscale(raw)  # 폰 사진은 수 MB — 그대로 보내면 비용·지연이 크다
