@@ -2,8 +2,7 @@
  * MORU 데이터 접근 계층.
  *
  * 백엔드 API 계약이 확정된 함수는 apiRequest() 로 실제 네트워크를 호출하고,
- * 아직 계약이 없는 화면은 src/mock 의 임시 데이터를 그대로 반환한다.
- * 화면 코드는 mock 을 직접 import 하지 않고 항상 이 모듈만 사용한다.
+ * 화면 코드는 서버를 직접 부르지 않고 항상 이 모듈만 사용한다.
  * 계약이 새로 확정되면 각 함수 내부의 구현만 apiRequest 호출로 교체하면 된다.
  *
  * 모든 함수는 Promise 를 반환한다.
@@ -47,11 +46,6 @@ import { apiRequest } from './apiClient';
 
 /** 공통 API client(apiClient.ts)의 base URL을 그대로 노출한다 — 중복 정의하지 않는다 */
 export { API_BASE_URL } from './apiClient';
-
-/** mock 데이터를 Promise 로 감싸기 위한 헬퍼 */
-function ok<T>(value: T): Promise<T> {
-  return Promise.resolve(value);
-}
 
 /* ------------------------------------------------------------------ */
 /* 사용자 / 온보딩                                                      */
