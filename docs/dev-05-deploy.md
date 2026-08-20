@@ -123,6 +123,41 @@ eas build --platform android --profile preview
 빌드는 Expo 클라우드에서 돌고 10~20분 걸린다. 끝나면 다운로드 링크가 나온다.
 **무료 플랜은 빌드 대기열이 있어서 발표 직전에 돌리면 안 된다. 전날 미리 뽑아둔다.**
 
+### 2-2b. 수정이 많을 때 — 빌드를 반복하지 않는다 ★
+
+EAS 빌드는 한 번에 10~20분이다. **고칠 때마다 빌드하면 하루가 날아간다.**
+세 갈래로 나눠서 쓴다.
+
+| 상황 | 방법 | 걸리는 시간 |
+|---|---|---|
+| 개발 중 반복 수정 | `npx expo start` + Expo Go | **즉시** (저장하면 반영) |
+| 이미 설치된 빌드에 JS 수정 반영 | `eas update` (OTA) | 수십 초 |
+| 네이티브가 바뀜 | `eas build` | 10~20분 |
+
+**재빌드가 꼭 필요한 경우는 이것뿐이다.**
+새 네이티브 모듈 추가 / `app.json` 의 plugins·권한 변경 / 아이콘·스플래시 교체 / SDK 업그레이드.
+화면·로직·API 연동 같은 JS 수정은 전부 위 두 방법으로 된다.
+
+#### OTA 를 쓰려면 `expo-updates` 가 필요하다
+
+현재 `package.json` 에 없다. **그래서 지금 나와 있는 빌드는 OTA 를 못 받는다.**
+설치하고 **한 번 더 빌드해야** 그 이후부터 OTA 가 먹는다.
+
+```bash
+npx expo install expo-updates
+eas update:configure
+eas build --platform android --profile preview   # 이 빌드부터 OTA 가능
+
+# 이후 JS 수정은 재빌드 없이
+eas update --branch preview --message "온보딩 저장 수정"
+```
+
+앱을 껐다 켜면 새 번들을 받는다.
+
+**언제 넣을지** — 지금 수정이 몰려 있다면 Expo Go 로 개발하다가,
+**데모 전날 `expo-updates` 를 넣고 최종 빌드를 한 번** 뽑는 게 낫다.
+그러면 당일 아침에 버그가 나와도 재빌드 없이 고칠 수 있다.
+
 ### 2-3. iOS
 
 App Store 배포는 개발자 계정 $99 가 필요하고 심사도 걸린다. **하지 않는다.**
