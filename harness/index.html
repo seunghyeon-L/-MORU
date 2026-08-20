@@ -382,7 +382,10 @@ function Home({go,empty}){
 // ── D1 입력 방식 ────────────────────────────────
 function D1({go}){
   const pick = async (method) => {
-    await call("POST","/meals/identify",{text:"김치찌개"});
+    if(method === "search"){        // D1 검색은 H1 로 보낸다 (프론트 설계)
+      window._pick = null; go("H1"); return;
+    }
+    window._pick = await call("POST","/meals/identify",{text:"김치찌개"});
     window._meal = {method}; go("D2");
   };
   return <>
@@ -402,7 +405,10 @@ function D1({go}){
 
 // ── D2 재료 확인 ────────────────────────────────
 function D2({go}){
-  const d = useApi(()=>call("POST","/meals/identify",{text:"김치찌개"}),[]);
+  // H5 "기록하기" 나 챗봇 칩에서 넘어온 게 있으면 그걸 쓴다.
+  const picked = window._pick;
+  const d = useApi(()=>picked ? Promise.resolve(picked)
+                              : call("POST","/meals/identify",{text:"김치찌개"}),[]);
   const [ing,setIng] = useState(null);
   const [portion,setPortion] = useState("one");
   const [broth,setBroth] = useState(true);
@@ -796,7 +802,14 @@ function H1({go}){
           {m.blocked && <div style={{fontSize:11,color:"var(--mute)",marginBottom:10}}>
             의료 판단이 필요한 질문은 답하지 않아요</div>}
           {(m.suggestions||[]).map((s,j)=>
-            <button key={j} className="chip" onClick={()=>go(s.screen)}>{s.label}</button>)}
+            <button key={j} className="chip" onClick={async()=>{
+              if(s.screen==="D2"){
+                window._pick = await call("POST","/meals/identify",{text:s.food_name});
+                window._meal = {method:"search"};
+              }
+              if(s.food_id != null) window._foodId = s.food_id;
+              go(s.screen);
+            }}>{s.label}</button>)}
         </div>)}
     </div>
     <div style={{display:"flex",gap:8,padding:"12px 20px 22px",borderTop:"1px solid var(--line)",background:"#fff"}}>
@@ -811,7 +824,8 @@ function H1({go}){
 
 // ── H4 음식 대체안 ──────────────────────────────
 function H4({go}){
-  const d = useApi(()=>call("GET","/foods/9/alternatives"),[]);
+  // 앞 화면에서 넘어온 food_id 를 쓴다. 없으면 김치찌개(1)로 떨어진다.
+  const d = useApi(()=>call("GET",`/foods/${window._foodId||1}/alternatives`),[]);
   if(!d) return <Loading/>;
   return <>
     <Nav t="음식 확인 결과" onBack={()=>go("C")}/>
@@ -822,7 +836,13 @@ function H4({go}){
       <h1 className="q" style={{fontSize:17,marginBottom:14}}>이 음식, 어떻게 먹어볼까요?</h1>
       {d.options.map(o=>
         <div className="card" key={o.kind} style={{cursor:o.screen?"pointer":"default"}}
-          onClick={()=>o.screen&&go(o.screen)}>
+          onClick={()=>{
+            if(!o.screen) return;
+            // 서버가 준 id 를 그대로 들고 간다. 프론트가 만들지 않는다.
+            if(o.ingredient_ids) window._subIds = o.ingredient_ids.join(",");
+            if(o.food_id != null) window._foodId = o.food_id;
+            go(o.screen);
+          }}>
           <h3>{o.title}</h3><p>{o.detail}</p>
         </div>)}
     </div>
@@ -832,7 +852,7 @@ function H4({go}){
 
 // ── H3 성분 대체 ────────────────────────────────
 function H3({go}){
-  const d = useApi(()=>call("GET","/substitutions?ingredient_ids=12,15"),[]);
+  const d = useApi(()=>call("GET",`/substitutions?ingredient_ids=${window._subIds||"1,2"}`),[]);
   if(!d) return <Loading/>;
   return <>
     <Nav t="성분 대체 방법" onBack={()=>go("H4")}/>
@@ -850,20 +870,38 @@ function H3({go}){
           <div className="n">{t.seq}</div>
           <div><div className="t">{t.title}</div><div className="d">{t.detail}</div></div>
         </div>)}
+      {!!(d.recipes||[]).length && <>
+        <h1 className="q" style={{fontSize:16,marginTop:20,marginBottom:12}}>이 재료로 만드는 레시피</h1>
+        {d.recipes.map(r=>
+          <div className="card" key={r.recipe_id} style={{cursor:"pointer"}}
+            onClick={()=>{ window._recipeId=r.recipe_id; go("H2"); }}>{r.title}</div>)}
+      </>}
     </div>
   </>;
 }
 
 // ── H5 메뉴 대체 ────────────────────────────────
 function H5({go}){
-  const d = useApi(()=>call("GET","/foods/9/menu-alternatives"),[]);
+  const d = useApi(()=>call("GET",`/foods/${window._foodId||1}/menu-alternatives`),[]);
   if(!d) return <Loading/>;
   return <>
     <Nav t="대체 메뉴 제안" onBack={()=>go("H4")}/>
     <div className="scroll">
       <h1 className="q" style={{fontSize:18,marginBottom:18}}>{d.headline}</h1>
       {d.items.map((x,i)=>
-        <div className="card" key={i}><h3>{x.name}</h3><p>{x.why}</p></div>)}
+        <div className="card" key={i}>
+          <h3>{x.name}</h3><p>{x.why}</p>
+          <div className="row" style={{marginTop:12}}>
+            {/* 기록은 food_id 가 아니라 identify 로 간다 */}
+            <button className="chip on" onClick={async()=>{
+              const r = await call("POST","/meals/identify",{text:x.name});
+              window._pick = {...r, food_name:x.name}; go("D2");
+            }}>기록하기</button>
+            {x.food_id != null &&
+              <button className="chip" onClick={()=>{ window._foodId=x.food_id; go("H4"); }}>
+                이렇게 먹어볼까요</button>}
+          </div>
+        </div>)}
       {d.has_more && <button className="btn ghost">더 많은 메뉴 보기</button>}
     </div>
   </>;
@@ -871,7 +909,7 @@ function H5({go}){
 
 // ── H2 레시피 ──────────────────────────────────
 function H2({go}){
-  const d = useApi(()=>call("GET","/recipes/3"),[]);
+  const d = useApi(()=>call("GET",`/recipes/${window._recipeId||1}`),[]);
   if(!d) return <Loading/>;
   return <>
     <Nav t="대체 레시피" onBack={()=>go("G")}/>
