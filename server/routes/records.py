@@ -40,22 +40,55 @@ _IDENTIFY_EXAMPLE = {
 }
 
 # B-4: 음식·재료 이름만 뽑는다. 판정이 아니라 입력이라 AI 를 써도 된다 (원칙 ④).
-_IDENTIFY_SYSTEM = """음식 사진이나 설명에서 음식 이름과 재료를 뽑는 도우미다.
-
-규칙:
+_COMMON_RULES = """규칙:
 - 실제로 보이거나 언급된 것만 적는다. 확실하지 않으면 넣지 않는다.
 - 재료는 짧은 일반 명사로 쓴다 ('국내산 양파' 대신 '양파', '진라면' 대신 '라면').
-- 재료가 하나도 없으면 빈 배열을 돌려준다. 지어내지 않는다.
-"""
+- 재료가 하나도 없으면 빈 배열을 돌려준다. 지어내지 않는다."""
+
+# 텍스트와 사진은 실패하는 방식이 달라서 지침을 나눈다.
+#
+# 사진은 "모르겠는데 뭐라도 답해야" 할 때 흔한 음식을 찍는 게 문제다.
+# 텍스트는 사용자가 직접 친 이름이라 그런 위험이 없다.
+# 사진용 지침을 텍스트에도 쓰면 모델이 "김치찌개" 를 보고도
+# is_food=false 를 낸다. 실제로 그렇게 깨졌다.
+
+_IDENTIFY_TEXT_SYSTEM = f"""사용자가 입력한 음식 이름에서 재료를 뽑는 도우미다.
+
+{_COMMON_RULES}
+
+is_food — 사용자가 친 것이 음식·음료 이름이면 true.
+  "김치찌개", "아메리카노", "엄마표 잡채" 는 전부 true 다.
+  음식과 무관한 말("안녕", "asdf")일 때만 false 다."""
+
+_IDENTIFY_PHOTO_SYSTEM = f"""음식 사진에서 음식 이름과 재료를 뽑는 도우미다.
+
+{_COMMON_RULES}
+
+★ is_food 를 반드시 정직하게 채운다.
+  음식이 아니거나(빈 화면·사물·풍경·글자만 있는 사진),
+  너무 흐리거나 어두워서 무엇인지 알 수 없으면 is_food = false 다.
+  이때 food_name 은 빈 문자열, ingredients 는 빈 배열로 둔다.
+
+  **모르겠으면 흔한 음식을 찍어서 답하지 마라.**
+  회색 화면을 보고 "김치찌개" 라고 답하는 것이 가장 나쁜 실패다.
+  사용자가 그대로 확인을 누르면 먹지도 않은 식사가 기록된다.
+  모르겠다고 답하면 사용자가 직접 입력한다. 그편이 낫다.
+
+  다만 음식이 분명히 보이면 주저하지 말고 채운다.
+  지나치게 몸을 사려서 실제 음식을 놓치는 것도 실패다."""
+
 
 _IDENTIFY_SCHEMA = {
     "type": "object",
     "properties": {
+        # 모델에게 "모르겠다" 고 말할 길을 준다.
+        # 이 칸이 없으면 모델은 뭐라도 답해야 해서 흔한 음식을 찍는다.
+        "is_food": {"type": "boolean"},
         "food_name": {"type": "string"},
         "has_broth": {"type": "boolean"},
         "ingredients": {"type": "array", "items": {"type": "string"}},
     },
-    "required": ["food_name", "has_broth", "ingredients"],
+    "required": ["is_food", "food_name", "has_broth", "ingredients"],
     "additionalProperties": False,
 }
 
@@ -119,9 +152,9 @@ async def identify_text(body: IdentifyIn, dev: str = Depends(device_id), db: Ses
     u = users.get_or_create(db, dev)
     r = llm.structured(
         db, purpose="identify_ingredients_text", model=llm.CLASSIFIER_MODEL,
-        system=_IDENTIFY_SYSTEM, user=body.text, schema=_IDENTIFY_SCHEMA, user_id=u.id,
+        system=_IDENTIFY_TEXT_SYSTEM, user=body.text, schema=_IDENTIFY_SCHEMA, user_id=u.id,
     )
-    if not r:
+    if not r or not r.get("is_food"):
         return {**_IDENTIFY_EMPTY, "food_name": body.text}
     return _resolve(db, r)
 
@@ -142,10 +175,12 @@ async def identify_photo(photo: UploadFile = File(...), dev: str = Depends(devic
     data_url = f"data:image/jpeg;base64,{base64.b64encode(jpeg).decode()}"
     r = llm.structured(
         db, purpose="identify_ingredients_photo", model=llm.CLASSIFIER_MODEL,
-        system=_IDENTIFY_SYSTEM, user="이 사진 속 음식과 재료를 알려줘.",
+        system=_IDENTIFY_PHOTO_SYSTEM, user="이 사진 속 음식과 재료를 알려줘.",
         schema=_IDENTIFY_SCHEMA, user_id=u.id, image_data_url=data_url,
     )
-    if not r:
+    # 음식이 아니라고 하면 그대로 빈 결과를 준다.
+    # 여기서 억지로 채우면 먹지도 않은 식사가 기록된다.
+    if not r or not r.get("is_food"):
         return _IDENTIFY_EMPTY
     return _resolve(db, r)
 
