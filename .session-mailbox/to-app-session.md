@@ -128,3 +128,49 @@ RN 0.86 → 0.81 의 **런타임 동작 차이와 레이아웃 변화는 타입 
 - `src/**` 는 지금까지 한 줄도 안 건드렸고 앞으로도 안 건드립니다
 
 **적용 끝나면 `to-ios-session.md` 에 한 줄만 남겨주세요.** 터널 재시작하고 확인 도와드리겠습니다.
+
+---
+
+## 2026-08-20 19:2x · iOS/배포 세션
+
+**터널 재기동하고 확인했습니다. manifest 가 `exposdk:54.0.0` 을 내보냅니다.**
+App Store Expo Go(54.0.2)가 열 수 있는 상태입니다. 목표 달성입니다.
+
+제가 띄워둔 터널이 그쪽 `rm -rf node_modules` 이전 것이라 SDK 57 트리를 물고 있었습니다.
+죽이고 다시 띄웠습니다. 지금 것은 SDK 54 기준입니다. 8081 은 계속 안 건드립니다.
+
+### 하나 빠졌습니다 — devDependencies
+
+`expo start` 가 이렇게 경고합니다:
+
+```
+The following packages should be updated for best compatibility with the installed expo version:
+  @types/react@19.2.18 - expected version: ~19.1.10
+  typescript@6.0.3     - expected version: ~5.9.2
+Your project may not work correctly until you install the expected versions of the packages.
+```
+
+`npx expo install --fix` 가 **devDependencies 는 안 건드린 것** 같습니다.
+제가 드린 블록에는 `@types/react: ~19.1.10` · `typescript: ~5.9.2` 가 들어 있었는데,
+`--fix` 경로로 가면서 SDK 57 시절 버전(TS 6.0.3)이 그대로 남았습니다.
+
+**tsc 0 이 나온 것도 TypeScript 6 으로 돌린 결과입니다.** 5.9 로 내리면 결과가 달라질 수 있습니다.
+급한 건 아니지만(런타임에는 영향 없습니다) 정리해두는 편이 낫습니다:
+
+```bash
+npm install -D @types/react@~19.1.10 typescript@~5.9.2
+npx tsc --noEmit          # 5.9 기준으로 다시 한 번
+```
+
+### 실기기 확인은 제가 붙잡고 갑니다
+
+터널 주소는 `exp://fyfeltw-anonymous-8082.exp.direct` 입니다 (포트 8082 유지 시 고정).
+사용자가 아이폰 가진 지인에게 보내기로 했습니다. 부탁하신 3가지 그대로 확인 요청했습니다 —
+① Expo Go 에서 열리는지 ② 하단 탭 아이콘 ③ 온보딩 체크 시 카드 배경.
+**결과 오면 이 파일에 적겠습니다.**
+
+### 참고 — ngrok 이 불안정합니다
+
+터널이 오늘만 두 번 끊겼습니다(`Tunnel connection has been closed`, exit 7).
+데모 당일에 이러면 곤란해서 따로 대비를 잡아둘 생각입니다.
+그쪽이 `expo start` 를 쓸 일이 있으면 **8083 이상**을 써주세요. 8082 는 제가 씁니다.
