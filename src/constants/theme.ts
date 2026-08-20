@@ -24,8 +24,18 @@ export const Colors = {
     brandText: '#5C6B47',
     borderSubtle: '#F0E9DD',
     textPrimary: '#3A342C',
-    textMuted: '#948B7B',
-    textOnBrand: '#FFFFFF',
+    textMuted: '#736B5B',
+    /**
+     * brand(#9BBFAE) 위에 얹는 글자색.
+     *
+     * 흰색이었는데 대비가 2.01:1 이라 WCAG AA(4.5:1) 에 한참 못 미쳤다.
+     * 칩·강도 선택처럼 '고르면 brand 로 채우는' 자리에서는
+     * **고른 쪽이 안 고른 쪽보다 안 보이는** 역전이 났다.
+     * 잉크색으로 바꾸면 6.12:1 이 되고 브랜드 그린은 그대로 남는다.
+     */
+    textOnBrand: '#3A342C',
+    /** 탭바 활성색. brand 는 흰 배경에서 2.01:1 이라 비활성(3.37:1)보다 흐렸다 */
+    tabActive: '#5C6B47',
     /** 증상 기록 카드 등 코랄 계열 포인트 (스크린샷 기준 근사치) */
     coral: '#C97C6D',
     coralLight: '#F5E2DD',
@@ -46,7 +56,9 @@ export const Colors = {
     borderSubtle: '#33362E',
     textPrimary: '#F5F1E8',
     textMuted: '#A79E8D',
-    textOnBrand: '#FFFFFF',
+    textOnBrand: '#3A342C',
+    /** 어두운 배경에서는 brand 자체가 10.46:1 이라 그대로 쓴다 */
+    tabActive: '#9BBFAE',
     coral: '#D99A8C',
     coralLight: '#3A2C28',
   },

@@ -14,6 +14,8 @@ type ForwardParams = {
   eaten_at?: string;
   portion?: string;
   ingredients?: string;
+  /** D3 에서 고른 방법. 서버에 저장하지 않고 이 화면에서만 보여준다 */
+  plan?: string;
 };
 
 /** D2 와 동일한 로컬 라벨 매핑 — 화면마다 로컬로 둔다(공용 PORTION_OPTIONS 라벨과 다른 Figma 문구) */
@@ -43,7 +45,7 @@ export default function FoodCompleteScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
-  const { food_name, eaten_at, portion, ingredients } = useLocalSearchParams<ForwardParams>();
+  const { food_name, eaten_at, portion, ingredients, plan } = useLocalSearchParams<ForwardParams>();
 
   const portionLabel = portion ? PORTION_LABELS[portion] : undefined;
   const foodSummary = [food_name, portionLabel].filter(Boolean).join(' · ');
@@ -107,6 +109,16 @@ export default function FoodCompleteScreen() {
               </ThemedText>
               <ThemedText type="label" themeColor="textPrimary" style={styles.summaryIngredients}>
                 {ingredientsSummary}
+              </ThemedText>
+            </View>
+          ) : null}
+          {plan ? (
+            <View style={styles.summaryRow}>
+              <ThemedText type="caption" themeColor="textMuted">
+                이렇게 드시기로
+              </ThemedText>
+              <ThemedText type="label" themeColor="textPrimary" style={styles.summaryIngredients}>
+                {plan}
               </ThemedText>
             </View>
           ) : null}

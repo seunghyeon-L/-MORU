@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/components/common/BackButton';
@@ -26,7 +26,10 @@ const STATIC_PROMPTS: StaticPrompt[] = [
   {
     id: 'recipe',
     title: '대체 레시피',
-    description: '속 편한 녹차라떼 레시피 보기',
+    // Figma 목업 문구가 '속 편한 녹차라떼 레시피 보기' 로 그대로 남아 있었다.
+    // 김치찌개를 물어본 사용자에게도 녹차라떼가 떴다.
+    // 음식이 확정되기 전에는 음식 이름을 말하지 않는다.
+    description: '속 편하게 먹을 수 있는 레시피 보기',
     iconBg: 'brandLight',
     Icon: DocumentIcon,
   },
@@ -214,7 +217,12 @@ export default function FoodChatScreen() {
               <SelectionCard
                 key={prompt.id}
                 title={prompt.title}
-                description={prompt.description}
+                description={
+                  // 대화에서 음식이 확정됐으면 그 음식으로 말한다.
+                  prompt.id === 'recipe' && targetFood?.food_name
+                    ? `${targetFood.food_name} 대신 먹을 만한 레시피 보기`
+                    : prompt.description
+                }
                 // targetFood 가 이미 확정돼 있으면 AI에게 다시 묻지 않고 곧장 그 음식의 H4로 이동한다.
                 // 아직 없으면 기존처럼 카드 문구를 채팅으로 보내 AI가 음식을 확정하게 한다.
                 onPress={() =>
@@ -235,6 +243,17 @@ export default function FoodChatScreen() {
                 }
               />
             ))}
+
+            {sending ? (
+              // 답변까지 2~4초. 그동안 아무 표시가 없어서
+              // 보낸 게 맞는지 알 수 없었고 사용자는 다시 눌렀다.
+              <View style={styles.typingRow}>
+                <ActivityIndicator size="small" color={theme.brand} />
+                <ThemedText type="caption" themeColor="textMuted">
+                  답을 찾고 있어요
+                </ThemedText>
+              </View>
+            ) : null}
           </View>
         </ScrollView>
 
@@ -250,9 +269,15 @@ export default function FoodChatScreen() {
               returnKeyType="send"
             />
           </ThemedView>
-          <Pressable onPress={() => send(input, true)} disabled={!input.trim()}>
-            <ThemedView type="brand" style={[styles.sendButton, !input.trim() && styles.sendButtonDimmed]}>
-              <SendArrowIcon size={18} color={theme.textOnBrand} />
+          <Pressable onPress={() => send(input, true)} disabled={!input.trim() || sending}>
+            <ThemedView
+              type="brand"
+              style={[styles.sendButton, (!input.trim() || sending) && styles.sendButtonDimmed]}>
+              {sending ? (
+                <ActivityIndicator size="small" color={theme.textOnBrand} />
+              ) : (
+                <SendArrowIcon size={18} color={theme.textOnBrand} />
+              )}
             </ThemedView>
           </Pressable>
         </View>
@@ -262,6 +287,12 @@ export default function FoodChatScreen() {
 }
 
 const styles = StyleSheet.create({
+  typingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingVertical: Spacing.two,
+  },
   flex: {
     flex: 1,
   },

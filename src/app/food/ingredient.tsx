@@ -59,11 +59,23 @@ export default function FoodIngredientScreen() {
       });
   }, [hasValidMealId, mealId]);
 
-  const finish = () =>
+  /**
+   * D4 로 넘어간다.
+   *
+   * 전에는 "그냥 먹을래요" 와 "기록하기" 가 **완전히 같은 함수**를 불렀고,
+   * 사용자가 고른 방법(selectedRank)은 아무 데도 쓰이지 않고 버려졌다.
+   * 고를 수 있게 해놓고 결과가 같으면 고른 행동 자체가 거짓말이 된다.
+   *
+   * 방법은 서버에 저장할 자리가 없다(POST /meals 에 해당 필드가 없다).
+   * 그래서 D4 화면까지만 들고 가서 "이렇게 드시기로 했어요" 로 보여준다.
+   */
+  const finish = (plan?: string) =>
     router.push({
       pathname: '/food/complete',
-      params: { meal_id, food_id, food_name, eaten_at, portion, ingredients },
+      params: { meal_id, food_id, food_name, eaten_at, portion, ingredients, plan },
     });
+
+  const selectedPlan = insight?.suggestions.find((s) => s.rank === selectedRank)?.title;
 
   return (
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
@@ -138,10 +150,14 @@ export default function FoodIngredientScreen() {
 
         <View style={styles.ctaRow}>
           <View style={styles.ctaPressable}>
-            <MORUButton label="그냥 먹을래요" variant="secondary" onPress={finish} />
+            <MORUButton label="그냥 먹을래요" variant="secondary" onPress={() => finish()} />
           </View>
           <View style={styles.ctaPressable}>
-            <MORUButton label="기록하기" variant="primary" onPress={finish} />
+            <MORUButton
+              label={selectedPlan ? '이 방법으로 할게요' : '기록하기'}
+              variant="primary"
+              onPress={() => finish(selectedPlan)}
+            />
           </View>
         </View>
       </ThemedView>

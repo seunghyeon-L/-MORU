@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/components/common/BackButton';
@@ -205,6 +205,17 @@ export default function FoodResultScreen() {
           </ThemedView>
         ) : null}
 
+        {!identify && !loadError ? (
+          // 사진 식별은 3~5초가 걸린다. 그동안 사진만 덩그러니 있고
+          // 아무 표시가 없어서 멈춘 것처럼 보였다.
+          <View style={styles.identifying}>
+            <ActivityIndicator size="small" color={theme.brand} />
+            <ThemedText type="bodyS" themeColor="textSecondary">
+              {method === 'photo' ? '사진 속 음식을 확인하고 있어요' : '재료를 확인하고 있어요'}
+            </ThemedText>
+          </View>
+        ) : null}
+
         {identify ? (
           <>
             <ThemedText type="h1" themeColor="textPrimary" style={styles.foodName}>
@@ -313,7 +324,8 @@ export default function FoodResultScreen() {
 
       <BottomButton
         label="확인"
-        disabled={!identify || !method || submitting}
+        loading={submitting}
+        disabled={!identify || !method}
         onPress={handleConfirm}
         secondary={
           resolvedFoodId
@@ -334,6 +346,13 @@ export default function FoodResultScreen() {
 }
 
 const styles = StyleSheet.create({
+  identifying: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingVertical: Spacing.five,
+    justifyContent: 'center',
+  },
   errorText: {
     marginTop: Spacing.three,
   },

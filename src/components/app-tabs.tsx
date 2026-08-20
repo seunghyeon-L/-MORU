@@ -35,10 +35,10 @@ export default function AppTabs() {
     <NativeTabs
       backgroundColor={colors.background}
       indicatorColor="transparent"
-      iconColor={{ default: colors.textMuted, selected: colors.brand }}
+      iconColor={{ default: colors.textMuted, selected: colors.tabActive }}
       labelStyle={{
         default: { color: colors.textMuted },
-        selected: { color: colors.brand },
+        selected: { color: colors.tabActive },
       }}>
       <NativeTabs.Trigger name="record">
         <Label>기록</Label>
