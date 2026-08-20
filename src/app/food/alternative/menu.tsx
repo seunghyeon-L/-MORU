@@ -1,37 +1,47 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/components/common/BackButton';
 import { MORUButton } from '@/components/common/MORUButton';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
 import * as api from '@/services/api';
-import type { MenuSuggestion } from '@/types/food';
+import type { MenuAlternativesResponse } from '@/types/food';
 
 /**
  * H5 대체 메뉴 제안.
- * 메뉴를 "기록하기"로 선택하면 D2(음식 확인) 흐름으로 다시 진입한다.
+ * GET /foods/{food_id}/menu-alternatives 를 그대로 표시한다. food_id 는 H4 응답에서만 받는다.
+ * has_more 는 표시 신호일 뿐 추가로 불러올 endpoint(offset/cursor)가 계약에 없어
+ * "더 보기" 동작은 만들지 않는다.
+ *
+ * "기록하기"는 item.name 으로 D2를 D1 텍스트 입력과 동일한 경로(POST /meals/identify)로 띄운다 —
+ * 이 food_id는 기록용이 아니라 H4 재진입 전용이라 여기서는 쓰지 않는다.
+ * "다른 방법으로 먹기"는 item.food_id 가 있을 때만 보여주고, 그 값을 그대로 H4에 전달한다.
  */
 export default function AlternativeMenuScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const theme = useTheme();
-  const [menus, setMenus] = useState<MenuSuggestion[]>([]);
-  const [moreLoaded, setMoreLoaded] = useState(false);
+  const { food_id } = useLocalSearchParams<{ food_id?: string }>();
+  const foodId = Number(food_id);
+  const hasValidFoodId = food_id !== undefined && Number.isFinite(foodId);
+
+  const [data, setData] = useState<MenuAlternativesResponse | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
-    api.getMenuSuggestions('food-jeyuk-bokkeum').then(setMenus);
-  }, []);
-
-  const loadMore = async () => {
-    const more = await api.getMoreMenuSuggestions('food-jeyuk-bokkeum');
-    setMenus((prev) => [...prev, ...more]);
-    setMoreLoaded(true);
-  };
+    if (!hasValidFoodId) return;
+    api
+      .getMenuAlternatives(foodId)
+      .then(setData)
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('[H5] GET /foods/{food_id}/menu-alternatives failed:', err);
+        setLoadError(true);
+      });
+  }, [hasValidFoodId, foodId]);
 
   return (
     <ThemedView type="onboardingBackground" style={styles.screen}>
@@ -43,35 +53,71 @@ export default function AlternativeMenuScreen() {
           </ThemedText>
         </View>
 
-        <ThemedText type="h1" themeColor="textPrimary" style={styles.title}>
-          제육볶음 대신 이런 메뉴는 어떠세요?
-        </ThemedText>
-
-        <View style={styles.list}>
-          {menus.map((menu) => (
-            <ThemedView key={menu.id} type="surfaceCard" style={styles.card}>
-              <View style={styles.cardRow}>
-                <ThemedView type="brandSoft" style={styles.thumb} />
-                <View style={styles.cardTexts}>
-                  <ThemedText type="label" themeColor="textPrimary">
-                    {menu.name}
-                  </ThemedText>
-                  <ThemedText type="caption" themeColor="textMuted">
-                    {menu.description}
-                  </ThemedText>
-                </View>
-              </View>
-              <MORUButton label="기록하기" onPress={() => router.push('/food/result')} />
-            </ThemedView>
-          ))}
-        </View>
-
-        {!moreLoaded ? (
-          <Pressable onPress={loadMore} style={[styles.moreButton, { borderColor: theme.borderSubtle }]}>
-            <ThemedText type="label" themeColor="textMuted">
-              더 많은 메뉴 보기
+        {data ? (
+          <>
+            <ThemedText type="h1" themeColor="textPrimary" style={styles.title}>
+              {data.headline}
             </ThemedText>
-          </Pressable>
+
+            {data.items.length > 0 ? (
+              <View style={styles.list}>
+                {data.items.map((item) => (
+                  <ThemedView key={item.name} type="surfaceCard" style={styles.card}>
+                    <View style={styles.cardRow}>
+                      <ThemedView type="brandSoft" style={styles.thumb} />
+                      <View style={styles.cardTexts}>
+                        <ThemedText type="label" themeColor="textPrimary">
+                          {item.name}
+                        </ThemedText>
+                        <ThemedText type="caption" themeColor="textMuted">
+                          {item.why}
+                        </ThemedText>
+                      </View>
+                    </View>
+                    <View style={styles.cardActions}>
+                      <View style={styles.cardActionFlex}>
+                        <MORUButton
+                          label="기록하기"
+                          onPress={() =>
+                            router.push({
+                              pathname: '/food/result',
+                              params: { foodName: item.name, mode: 'search' },
+                            })
+                          }
+                        />
+                      </View>
+                      {item.food_id != null ? (
+                        <View style={styles.cardActionFlex}>
+                          <MORUButton
+                            label="다른 방법으로 먹기"
+                            variant="secondary"
+                            onPress={() =>
+                              router.push({
+                                pathname: '/food/alternative',
+                                params: { food_id: String(item.food_id) },
+                              })
+                            }
+                          />
+                        </View>
+                      ) : null}
+                    </View>
+                  </ThemedView>
+                ))}
+              </View>
+            ) : (
+              <ThemedText type="bodyS" themeColor="textSecondary" style={styles.errorText}>
+                지금은 추천할 대체 메뉴가 없어요.
+              </ThemedText>
+            )}
+          </>
+        ) : !hasValidFoodId ? (
+          <ThemedText type="bodyS" themeColor="textSecondary" style={styles.errorText}>
+            불러올 음식 정보가 없어요.
+          </ThemedText>
+        ) : loadError ? (
+          <ThemedText type="bodyS" themeColor="textSecondary" style={styles.errorText}>
+            대체 메뉴를 불러오지 못했어요. 잠시 후 다시 시도해주세요.
+          </ThemedText>
         ) : null}
       </ScrollView>
     </ThemedView>
@@ -120,12 +166,14 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 3,
   },
-  moreButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 15,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginTop: 4,
+  cardActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  cardActionFlex: {
+    flex: 1,
+  },
+  errorText: {
+    marginTop: Spacing.three,
   },
 });

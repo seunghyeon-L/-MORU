@@ -64,7 +64,7 @@ export default function FoodCompleteScreen() {
           <View style={[styles.dot, styles.dotLeft, { backgroundColor: theme.brandLighter }]} />
           <View style={[styles.dot, styles.dotRight, { backgroundColor: theme.coralLight }]} />
           <ThemedView type="surfaceCard" style={styles.heroCircle}>
-            <SproutIcon size={48} color={theme.brand} />
+            <SproutIcon size={54} color={theme.brand} />
           </ThemedView>
           <ThemedView
             type="brand"
@@ -140,25 +140,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   heroWrap: {
-    width: 124,
-    height: 124,
+    width: 136,
+    height: 136,
     alignItems: 'center',
     justifyContent: 'center',
   },
   heroCircle: {
-    width: 124,
-    height: 124,
-    borderRadius: 62,
+    width: 136,
+    height: 136,
+    borderRadius: 68,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkBadge: {
     position: 'absolute',
-    right: 2,
-    bottom: 2,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    right: 4,
+    bottom: 4,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
@@ -178,15 +178,15 @@ const styles = StyleSheet.create({
     top: 4,
   },
   headline: {
-    fontSize: 22,
-    lineHeight: 30,
+    fontSize: 24,
+    lineHeight: 32,
     marginTop: Spacing.three,
   },
   summaryCard: {
     width: '100%',
     borderRadius: 16,
-    padding: 18,
-    gap: 14,
+    padding: 20,
+    gap: 16,
     marginTop: Spacing.five,
   },
   summaryRow: {

@@ -13,8 +13,22 @@ import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
 import * as api from '@/services/api';
 import type { FoodRecord } from '@/types/food';
-import { EMPTY_ONBOARDING_DATA, type OnboardingData } from '@/types/onboarding';
-import type { SymptomRecord } from '@/types/symptom';
+import {
+  ALLERGY_OPTIONS,
+  AVOIDED_FOOD_OPTIONS,
+  EMPTY_ONBOARDING_DATA,
+  type BaselineFrequency,
+  type OnboardingData,
+  type SymptomFrequency,
+} from '@/types/onboarding';
+import { SYMPTOM_TYPE_OPTIONS, type SymptomRecord } from '@/types/symptom';
+
+/** 로컬 3단계 빈도 → 서버 6단계 enum. 각 옵션의 실제 안내 문구(한 달에 1~2번 등) 기준으로 매핑한다 */
+const FREQUENCY_TO_API: Record<SymptomFrequency, BaselineFrequency> = {
+  rarely: 'monthly_1_2',
+  weekly: 'weekly_1_2',
+  daily: 'almost_daily',
+};
 
 export type MoruState = {
   /** 온보딩 중 사용자가 고른 값 (로컬 상태) */
@@ -94,11 +108,40 @@ export function useMoruData() {
     setState({ onboarding: EMPTY_ONBOARDING_DATA });
   }, []);
 
-  /** 온보딩 마지막 화면에서 호출 */
+  /**
+   * 온보딩 마지막 화면에서 호출. POST /onboarding/profile 은 화면에 표시된 칩 문자열을
+   * 그대로 보낸다 — "없음"을 뜻하는 로컬 전용 선택지('none')만 제외하고 임의로 바꾸지 않는다.
+   */
   const completeOnboarding = useCallback(async () => {
     const completed: OnboardingData = { ...state.onboarding, completed: true };
     setState({ onboarding: completed });
-    await api.saveOnboardingData(completed);
+
+    const allergies = completed.allergies
+      .filter((id) => id !== 'none')
+      .flatMap((id) => {
+        const label = ALLERGY_OPTIONS.find((option) => option.id === id)?.label;
+        return label ? [label] : [];
+      });
+    const avoidedFoods = completed.avoidedFoods
+      .filter((id) => id !== 'none')
+      .flatMap((id) => {
+        const label = AVOIDED_FOOD_OPTIONS.find((option) => option.id === id)?.label;
+        return label ? [label] : [];
+      });
+    const baselineSymptoms = completed.usualSymptoms.flatMap((id) => {
+      const label = SYMPTOM_TYPE_OPTIONS.find((option) => option.id === id)?.label;
+      return label ? [label] : [];
+    });
+
+    await api.saveOnboardingData({
+      allergies,
+      avoided_foods: avoidedFoods,
+      baseline_symptoms: baselineSymptoms,
+      ...(completed.celiacDiagnosis ? { celiac: completed.celiacDiagnosis } : {}),
+      ...(completed.symptomFrequency
+        ? { baseline_frequency: FREQUENCY_TO_API[completed.symptomFrequency] }
+        : {}),
+    });
   }, []);
 
   const addSymptomRecord = useCallback(async (record: SymptomRecord) => {

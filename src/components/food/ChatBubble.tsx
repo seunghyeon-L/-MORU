@@ -1,4 +1,4 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -14,7 +14,9 @@ export function ChatBubble({ message }: ChatBubbleProps) {
   const isUser = message.role === 'user';
 
   return (
-    <ThemedView style={[styles.row, isUser ? styles.rowEnd : styles.rowStart]}>
+    // 배경이 없는 순수 레이아웃 행 — ThemedView(배경 있음)를 쓰면 메시지마다
+    // 화면 전체 폭짜리 흰 띠가 깔려 이어 붙은 큰 흰 사각형처럼 보인다.
+    <View style={[styles.row, isUser ? styles.rowEnd : styles.rowStart]}>
       {!isUser ? (
         <ThemedView type="brand" style={styles.avatar}>
           <ThemedText type="caption" themeColor="textOnBrand">
@@ -22,12 +24,17 @@ export function ChatBubble({ message }: ChatBubbleProps) {
           </ThemedText>
         </ThemedView>
       ) : null}
-      <ThemedView type="surfaceCard" style={styles.bubble}>
-        <ThemedText type="bodyS" themeColor="textPrimary" style={styles.bubbleText}>
+      <ThemedView
+        type={isUser ? 'brand' : 'surfaceCard'}
+        style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAssistant]}>
+        <ThemedText
+          type="bodyS"
+          themeColor={isUser ? 'textOnBrand' : 'textPrimary'}
+          style={styles.bubbleText}>
           {message.text}
         </ThemedText>
       </ThemedView>
-    </ThemedView>
+    </View>
   );
 }
 
@@ -56,6 +63,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderRadius: 18,
+  },
+  bubbleUser: {
+    borderBottomRightRadius: 6,
+  },
+  bubbleAssistant: {
+    borderBottomLeftRadius: 6,
   },
   bubbleText: {
     lineHeight: 22,

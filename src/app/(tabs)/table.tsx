@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CandidateFoodCard } from '@/components/table/CandidateFoodCard';
@@ -149,16 +149,40 @@ export default function TableScreen() {
                   저장한 추천
                 </ThemedText>
                 <View style={styles.savedList}>
-                  {table.saved_recommendations.map((rec) => (
-                    <ThemedView
-                      key={`${rec.kind}-${rec.ref_id}`}
-                      type="surfaceCard"
-                      style={styles.savedCard}>
-                      <ThemedText type="label" themeColor="textPrimary">
-                        {rec.title}
-                      </ThemedText>
-                    </ThemedView>
-                  ))}
+                  {table.saved_recommendations.map((rec) => {
+                    const card = (
+                      <ThemedView type="surfaceCard" style={styles.savedCard}>
+                        <ThemedText type="label" themeColor="textPrimary">
+                          {rec.title}
+                        </ThemedText>
+                      </ThemedView>
+                    );
+                    const key = `${rec.kind}-${rec.ref_id}`;
+                    // screen 기준으로 진입 화면을 정한다 — kind 로 다시 추론하지 않는다
+                    const target =
+                      rec.screen === 'H2'
+                        ? { pathname: '/food/alternative/recipe' as const, params: { recipe_id: String(rec.ref_id) } }
+                        : rec.screen === 'H3'
+                          ? {
+                              pathname: '/food/alternative/substitute' as const,
+                              params: { ingredient_ids: String(rec.ref_id) },
+                            }
+                          : rec.screen === 'H5'
+                            ? {
+                                pathname: '/food/alternative/menu' as const,
+                                params: { food_id: String(rec.ref_id) },
+                              }
+                            : null;
+
+                    if (!target) {
+                      return <View key={key}>{card}</View>;
+                    }
+                    return (
+                      <Pressable key={key} onPress={() => router.push(target)}>
+                        {card}
+                      </Pressable>
+                    );
+                  })}
                 </View>
               </View>
             ) : null}

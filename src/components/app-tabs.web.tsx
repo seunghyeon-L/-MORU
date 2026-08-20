@@ -100,18 +100,18 @@ export function TabButton({ children, isFocused, name, ...props }: TabButtonProp
   return (
     <Pressable {...props} style={({ pressed }) => [styles.tabButton, pressed && styles.pressed]}>
       <View style={styles.icon}>
-        {name === 'record' ? <CameraIcon size={22} color={color} /> : null}
+        {name === 'record' ? <CameraIcon size={24} color={color} /> : null}
         {name === 'home' ? (
           <SymbolView
             name={{ ios: 'house', android: 'home', web: 'home' }}
             type="monochrome"
             weight="light"
-            size={22}
+            size={24}
             tintColor={color}
             style={styles.icon}
           />
         ) : null}
-        {name === 'table' ? <TableIcon size={22} color={color} /> : null}
+        {name === 'table' ? <TableIcon size={24} color={color} /> : null}
       </View>
       <ThemedText type="small" style={{ color }}>
         {children}
@@ -150,13 +150,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
-    paddingTop: Spacing.two,
-    paddingBottom: Spacing.one,
+    gap: 4,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.two,
   },
   icon: {
-    width: 22,
-    height: 22,
+    width: 24,
+    height: 24,
   },
   pressed: {
     opacity: 0.7,

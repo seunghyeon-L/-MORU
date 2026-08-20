@@ -147,3 +147,29 @@ export const EMPTY_ONBOARDING_DATA: OnboardingData = {
   usualSymptoms: [],
   completed: false,
 };
+
+/* ------------------------------------------------------------------ */
+/* B2·B3·B4 저장 — POST /onboarding/profile 실제 API 요청/응답            */
+/* ------------------------------------------------------------------ */
+
+export type BaselineFrequency =
+  | 'rare'
+  | 'monthly_1_2'
+  | 'weekly_few'
+  | 'weekly_1_2'
+  | 'almost_daily'
+  | 'weekly_3plus';
+
+export type ProfileRequest = {
+  nickname?: string | null;
+  allergies?: string[];
+  celiac?: 'yes' | 'no' | 'unknown';
+  avoided_foods?: string[];
+  baseline_symptoms?: string[];
+  baseline_frequency?: BaselineFrequency;
+};
+
+export type ProfileResponse = {
+  user_id: number;
+  onboarded: boolean;
+};

@@ -5,14 +5,7 @@
  * (그중 3회에 불편함 기록이 붙는다 — mock/symptoms.ts 참고)
  */
 
-import type {
-  FoodItem,
-  FoodRecord,
-  Ingredient,
-  IngredientSubstitution,
-  MenuSuggestion,
-  Recipe,
-} from '@/types/food';
+import type { FoodItem, FoodRecord, Ingredient } from '@/types/food';
 
 /* ------------------------------------------------------------------ */
 /* 재료                                                                 */
@@ -138,55 +131,10 @@ export const mockFoodRecords: FoodRecord[] = [
 ];
 
 /* ------------------------------------------------------------------ */
-/* 대체 레시피 (food/alternative/recipe — H2)                           */
-/* ------------------------------------------------------------------ */
-
-export const mockRecipe: Recipe = {
-  id: 'recipe-green-tea-latte',
-  title: '속 편한 녹차라떼 레시피',
-  ingredients: [
-    { name: '우유 (또는 락토프리 우유)', amount: '150ml' },
-    { name: '녹차가루', amount: '1/2 tsp' },
-    { name: '알룰로스', amount: '1 tsp (선택)' },
-    { name: '바닐라 익스트랙', amount: '2~3방울 (선택)' },
-  ],
-  tip: '우유 대신 오트우유를 사용하면 더 편안할 수 있어요.',
-};
-
-/* ------------------------------------------------------------------ */
-/* 성분 대체 방법 (food/alternative/substitute — H3)                     */
-/* ------------------------------------------------------------------ */
-
-export const mockSubstitutions: IngredientSubstitution[] = [
-  { id: 'sub-milk', original: '우유', substitute: '락토프리 우유', note: '또는 오트우유, 아몬드우유' },
-  { id: 'sub-sugar', original: '설탕', substitute: '알룰로스, 스테비아', note: '또는 꿀 소량' },
-  { id: 'sub-syrup', original: '시럽/소스', substitute: '바닐라 익스트랙', note: '또는 시나몬 파우더' },
-];
-
-export const mockSubstitutionTips = [
-  { title: '양을 줄여서 시작하기', description: '소량으로 먼저 시도해보세요.' },
-  { title: '공복은 피하기', description: '식사 후 또는 간식과 함께 드세요.' },
-];
-
-/* ------------------------------------------------------------------ */
-/* 대체 메뉴 제안 (food/alternative/menu — H5)                          */
-/* ------------------------------------------------------------------ */
-
-export const mockMenuSuggestions: MenuSuggestion[] = [
-  { id: 'menu-1', name: '간장 돼지고기 덮밥', description: '양념 자극이 적어요.' },
-  { id: 'menu-2', name: '두부 간장 덮밥', description: '식물성 단백질로 편안하게.' },
-  { id: 'menu-3', name: '오징어 숙주볶음', description: '매운 양념 없이 깔끔해요.' },
-];
-
-export const mockMoreMenuSuggestions: MenuSuggestion[] = [
-  { id: 'menu-4', name: '순두부 덮밥', description: '부드럽고 자극이 적어요.' },
-  { id: 'menu-5', name: '가자미 조림', description: '담백한 흰살 생선 메뉴예요.' },
-];
-
-/* ------------------------------------------------------------------ */
+/* H2~H5(레시피/성분 대체/대체 메뉴/음식 기반 대체안) — 실제 API 연동으로     */
+/* 대체되어 더 이상 사용하지 않는다 (services/api.ts 참고)                  */
 /* AI 채팅 (food/chat) — POST /chat/messages 실제 연동으로 대체되어         */
 /* 더 이상 사용하지 않는다. 대화 이력을 불러오는 엔드포인트는 계약에 없다      */
-/* ------------------------------------------------------------------ */
 /* 나의 식탁 ((tabs)/table) — GET /mytable 실제 연동으로 대체되어          */
 /* 더 이상 사용하지 않는다 (services/api.ts 의 getMyTable 참고)             */
 /* ------------------------------------------------------------------ */

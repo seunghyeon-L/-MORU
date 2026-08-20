@@ -282,6 +282,52 @@ export function MoreVerticalIcon({ size, color }: IconProps) {
   );
 }
 
+/** H2 대체 레시피 상단 일러스트 — 빨대 꽂힌 음료 컵 */
+export function CupIcon({ size, color }: IconProps) {
+  const s = size / 24;
+  return (
+    <View style={{ width: size, height: size }}>
+      <View
+        style={{
+          position: 'absolute',
+          left: 5 * s,
+          top: 8 * s,
+          width: 14 * s,
+          height: 13 * s,
+          borderBottomLeftRadius: 3 * s,
+          borderBottomRightRadius: 3 * s,
+          borderWidth: STROKE,
+          borderColor: color,
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          left: 4 * s,
+          top: 6 * s,
+          width: 16 * s,
+          height: 3 * s,
+          borderRadius: 1.5 * s,
+          borderWidth: STROKE,
+          borderColor: color,
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          left: 13.5 * s,
+          top: 1 * s,
+          width: STROKE,
+          height: 8 * s,
+          borderRadius: 1,
+          backgroundColor: color,
+          transform: [{ rotate: '18deg' }],
+        }}
+      />
+    </View>
+  );
+}
+
 /** D1 "원재료표 촬영" — 문서/라벨 */
 export function DocumentIcon({ size, color }: IconProps) {
   const s = size / 24;

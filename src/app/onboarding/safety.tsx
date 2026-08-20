@@ -100,13 +100,18 @@ export default function SafetyScreen() {
       updateOnboarding({ safetyFlags: result.flags });
 
       if (result.blocked) {
+        // B1x에 표시할 항목은 key 가 아니라 GET 응답의 label 로 보여준다
+        const flagLabels = result.flags
+          .map((key) => data.items.find((item) => item.key === key)?.label)
+          .filter((label): label is string => Boolean(label));
+
         router.push({
           pathname: '/onboarding/medical',
           params: {
             title: result.title,
             body: result.body,
             footer: result.footer,
-            flags: result.flags.join(','),
+            flags: flagLabels.join(','),
           },
         });
       } else {

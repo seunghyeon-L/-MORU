@@ -9,32 +9,27 @@
  * 모든 함수는 Promise 를 반환한다.
  */
 
-import {
-  mockFoodItems,
-  mockFoodRecords,
-  mockMenuSuggestions,
-  mockMoreMenuSuggestions,
-  mockRecipe,
-  mockSubstitutions,
-} from '@/mock/foods';
+import { mockFoodRecords } from '@/mock/foods';
 import { mockSymptomRecords } from '@/mock/symptoms';
 import type { PatternsResponse } from '@/types/analysis';
 import type {
   ChatSendRequest,
   ChatSendResponse,
-  FoodItem,
+  FoodAlternativesResponse,
   FoodRecord,
-  IngredientSubstitution,
   MealCreateRequest,
   MealCreateResponse,
   MealIdentifyResponse,
   MealInsightResponse,
-  MenuSuggestion,
+  MenuAlternativesResponse,
   MyTableResponse,
-  Recipe,
+  RecipeDetail,
+  SaveRecommendationRequest,
+  SaveRecommendationResponse,
+  SubstitutionsResponse,
 } from '@/types/food';
 import type { HomeResponse, SnoozeResponse } from '@/types/home';
-import type { OnboardingData } from '@/types/onboarding';
+import type { ProfileRequest, ProfileResponse } from '@/types/onboarding';
 import type {
   ChallengeAttemptRequest,
   ChallengeAttemptResponse,
@@ -63,10 +58,9 @@ function ok<T>(value: T): Promise<T> {
 /* 사용자 / 온보딩                                                      */
 /* ------------------------------------------------------------------ */
 
-export function saveOnboardingData(data: OnboardingData): Promise<OnboardingData> {
-  // TODO: POST /onboarding/profile — nickname 입력 UI, frequency 6단계 매핑, allergies/avoided_foods/
-  // baseline_symptoms 서버 vocabulary가 확정되기 전까지는 실제 호출로 바꾸지 않는다 (BLOCKED)
-  return ok(data);
+/** B2·B3·B4 저장. nickname 은 선택값이라 보내지 않는다 — payload 는 호출부(useMoruData)에서 만든다 */
+export function saveOnboardingData(payload: ProfileRequest): Promise<ProfileResponse> {
+  return apiRequest<ProfileResponse>('/onboarding/profile', { method: 'POST', body: payload });
 }
 
 /** 앱 부팅 시 최초 1회 호출. onboarded/blocked 상태를 확인한다 */
@@ -108,29 +102,29 @@ export function getMealInsight(mealId: number): Promise<MealInsightResponse> {
   return apiRequest<MealInsightResponse>(`/meals/${mealId}/insight`);
 }
 
-/** food/alternative (H4) — id로 특정 음식 항목 조회 */
-export function getFoodItem(foodItemId: string): Promise<FoodItem | undefined> {
-  return ok(mockFoodItems.find((item) => item.id === foodItemId));
+/** H4 — food_id 는 D1 identify 응답 또는 H1 suggestion 에서만 받는다(프론트에서 생성하지 않는다) */
+export function getFoodAlternatives(foodId: number): Promise<FoodAlternativesResponse> {
+  return apiRequest<FoodAlternativesResponse>(`/foods/${foodId}/alternatives`);
 }
 
-/** food/alternative/recipe (H2) */
-export function getRecipe(_recipeId: string): Promise<Recipe> {
-  return ok(mockRecipe);
+/** H5 — food_id 는 H4 응답(options[kind="menu"].food_id)에서 그대로 받는다 */
+export function getMenuAlternatives(foodId: number): Promise<MenuAlternativesResponse> {
+  return apiRequest<MenuAlternativesResponse>(`/foods/${foodId}/menu-alternatives`);
 }
 
-/** food/alternative/substitute (H3) */
-export function getIngredientSubstitutions(_foodItemId: string): Promise<IngredientSubstitution[]> {
-  return ok(mockSubstitutions);
+/** H3 — ingredient_ids 는 H4 응답(options[kind="substitute"].ingredient_ids)에서 그대로 받는다 */
+export function getSubstitutions(ingredientIds: number[]): Promise<SubstitutionsResponse> {
+  return apiRequest<SubstitutionsResponse>(`/substitutions?ingredient_ids=${ingredientIds.join(',')}`);
 }
 
-/** food/alternative/menu (H5) */
-export function getMenuSuggestions(_foodItemId: string): Promise<MenuSuggestion[]> {
-  return ok(mockMenuSuggestions);
+/** H2 — recipe_id 는 H3 응답(recipes[].recipe_id) 또는 G 의 saved_recommendations(ref_id)에서 받는다 */
+export function getRecipe(recipeId: number): Promise<RecipeDetail> {
+  return apiRequest<RecipeDetail>(`/recipes/${recipeId}`);
 }
 
-/** "더 많은 메뉴 보기" — 지금은 고정된 mock 목록을 추가로 보여준다 */
-export function getMoreMenuSuggestions(_foodItemId: string): Promise<MenuSuggestion[]> {
-  return ok(mockMoreMenuSuggestions);
+/** G "저장한 추천"에 쌓인다. H2 "레시피 저장" 버튼에서만 호출한다 */
+export function saveRecommendation(payload: SaveRecommendationRequest): Promise<SaveRecommendationResponse> {
+  return apiRequest<SaveRecommendationResponse>('/saved', { method: 'POST', body: payload });
 }
 
 /* ------------------------------------------------------------------ */

@@ -6,7 +6,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/components/common/BackButton';
 import { BottomButton } from '@/components/common/BottomButton';
-import { CameraIcon } from '@/components/common/icons';
 import { IngredientChip } from '@/components/food/IngredientChip';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -36,22 +35,30 @@ const PORTION_API_MAP: Record<Portion, MealApiPortion> = {
   large: 'one_and_half_plus',
 };
 
+/** POST /meals 의 portion 은 필수값이다 — 사용자가 직접 고르지 않았을 때만 이 값으로 채운다 */
+const DEFAULT_PORTION: Portion = 'normal';
+
 /**
  * D2 음식 확인 · 재료 확인.
  * 사진(POST /meals/identify-photo)/텍스트(POST /meals/identify)로 추정된 음식의 재료를
  * 사용자가 직접 확인·수정하고, 섭취량·국물 여부와 함께 확인 버튼에서 POST /meals 로 확정한다.
  *
- * method(서버 enum: photo|text|search) 는 사진 경로("photo")만 근거가 명확하다.
- * 텍스트 경로(메뉴 검색/직접 입력)는 현재 food/chat.tsx 에서 mode(search|manual)가
- * 이 화면까지 전달되지 않고, search/text 중 무엇에 대응하는지도 계약에 없어
- * POST /meals 호출을 보류한다(BLOCKED) — 확인 버튼이 비활성 상태로 남는다.
+ * method(서버 enum: photo|text|search) 는 진입 경로 그대로 매핑한다.
+ * D1 "메뉴 검색"은 food/chat.tsx 가 mode=search 를 그대로 넘겨 "search"로,
+ * "직접 입력"은 mode=manual 을 자유 텍스트 입력으로 보고 "text"로 매핑한다.
  */
 export default function FoodResultScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
-  // photoUri: 카메라(D1)에서 촬영한 사진, foodName: H1(메뉴 검색/직접 입력)에서 입력한 음식명
-  const { photoUri, foodName } = useLocalSearchParams<{ photoUri?: string; foodName?: string }>();
+  // photoUri: 카메라(D1)에서 촬영한 사진, foodName/mode: H1(메뉴 검색/직접 입력)에서 전달
+  // food_id: H1 suggestion(screen="D2")에서 이미 확인된 food_id 를 전달받았을 때만 온다
+  const { photoUri, foodName, mode, food_id } = useLocalSearchParams<{
+    photoUri?: string;
+    foodName?: string;
+    mode?: string;
+    food_id?: string;
+  }>();
 
   const [identify, setIdentify] = useState<MealIdentifyResponse | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -59,13 +66,19 @@ export default function FoodResultScreen() {
   const [customIngredients, setCustomIngredients] = useState<Ingredient[]>([]);
   const [addingCustom, setAddingCustom] = useState(false);
   const [customText, setCustomText] = useState('');
+  /** 화면엔 기본 선택 없이 두고, 확정 시 값이 없으면 DEFAULT_PORTION 으로만 채운다(아래 handleConfirm 참고) */
   const [portion, setPortion] = useState<Portion | undefined>();
   const [hasSoup, setHasSoup] = useState<boolean | undefined>();
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(false);
 
-  /** 사진 경로만 method 를 확정할 수 있다 — 나머지는 BLOCKED (파일 상단 주석 참고) */
-  const method: MealApiMethod | undefined = photoUri ? 'photo' : undefined;
+  const method: MealApiMethod | undefined = photoUri
+    ? 'photo'
+    : mode === 'search'
+      ? 'search'
+      : mode === 'manual'
+        ? 'text'
+        : undefined;
 
   useEffect(() => {
     const load = foodName
@@ -77,7 +90,6 @@ export default function FoodResultScreen() {
         setIdentify(result);
         // 서버가 미리 선택해준 checked 를 그대로 초기 선택 상태로 쓴다
         setSelectedIds(result.ingredients.filter((i) => i.checked).map((i) => String(i.id)));
-        setHasSoup(result.has_broth);
       })
       .catch((err) => {
         // eslint-disable-next-line no-console
@@ -105,8 +117,11 @@ export default function FoodResultScreen() {
     ? [...identify.ingredients.map((i) => ({ id: String(i.id), name: i.name })), ...customIngredients]
     : [];
 
+  /** H1 suggestion 이 준 food_id 가 있으면 그걸 그대로 쓰고, 없으면 identify 응답의 food_id 를 쓴다 */
+  const resolvedFoodId = food_id ? Number(food_id) : identify?.food_id;
+
   const handleConfirm = async () => {
-    if (!identify || !portion || !method || submitting) return;
+    if (!identify || !method || submitting) return;
 
     setSubmitError(false);
     setSubmitting(true);
@@ -121,10 +136,10 @@ export default function FoodResultScreen() {
         .filter((name): name is string => Boolean(name));
 
       const result = await api.createMeal({
-        food_id: identify.food_id,
+        food_id: resolvedFoodId ?? null,
         food_name: identify.food_name,
         eaten_at: eatenAt,
-        portion: PORTION_API_MAP[portion],
+        portion: PORTION_API_MAP[portion ?? DEFAULT_PORTION],
         ate_broth: hasSoup ?? null,
         method,
         ingredient_ids: ingredientIds,
@@ -138,10 +153,10 @@ export default function FoodResultScreen() {
 
       const forwardParams = {
         meal_id: String(result.meal_id),
-        food_id: String(identify.food_id),
+        food_id: resolvedFoodId ? String(resolvedFoodId) : undefined,
         food_name: identify.food_name,
         eaten_at: eatenAt,
-        portion,
+        portion: portion ?? DEFAULT_PORTION,
         ingredients: ingredientNames,
       };
 
@@ -171,20 +186,11 @@ export default function FoodResultScreen() {
           </ThemedText>
         </View>
 
-        <ThemedView type="surfaceCard" style={styles.photoCard}>
-          {photoUri ? (
+        {photoUri ? (
+          <ThemedView type="surfaceCard" style={styles.photoCard}>
             <Image source={{ uri: photoUri }} style={styles.photoImage} contentFit="cover" />
-          ) : (
-            <>
-              <ThemedView type="brandSoft" style={styles.photoIconWrap}>
-                <CameraIcon size={24} color={theme.brandText} />
-              </ThemedView>
-              <ThemedText type="caption" themeColor="textMuted" style={styles.photoLabel}>
-                촬영한 사진
-              </ThemedText>
-            </>
-          )}
-        </ThemedView>
+          </ThemedView>
+        ) : null}
 
         {identify ? (
           <>
@@ -234,7 +240,10 @@ export default function FoodResultScreen() {
               {PORTION_OPTIONS.map((option) => {
                 const active = portion === option.id;
                 return (
-                  <Pressable key={option.id} style={styles.portionPressable} onPress={() => setPortion(option.id)}>
+                  <Pressable
+                    key={option.id}
+                    style={styles.portionPressable}
+                    onPress={() => setPortion((prev) => (prev === option.id ? undefined : option.id))}>
                     <ThemedView
                       type={active ? 'brand' : 'surfaceCard'}
                       style={[styles.portionOption, { borderColor: active ? theme.brand : theme.borderSubtle }]}>
@@ -247,30 +256,34 @@ export default function FoodResultScreen() {
               })}
             </View>
 
-            <ThemedView type="surfaceCard" style={styles.soupCard}>
-              <ThemedText type="label" themeColor="textPrimary">
-                국물도 드셨나요?
-              </ThemedText>
-              <View style={styles.soupOptions}>
-                {[
-                  { id: true, label: '네' },
-                  { id: false, label: '아니요' },
-                ].map((option) => {
-                  const active = hasSoup === option.id;
-                  return (
-                    <Pressable key={String(option.id)} onPress={() => setHasSoup(option.id)}>
-                      <ThemedView
-                        type={active ? 'brand' : 'onboardingBackground'}
-                        style={styles.soupOption}>
-                        <ThemedText type="label" themeColor={active ? 'textOnBrand' : 'textMuted'}>
-                          {option.label}
-                        </ThemedText>
-                      </ThemedView>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </ThemedView>
+            {identify.has_broth ? (
+              <ThemedView type="surfaceCard" style={styles.soupCard}>
+                <ThemedText type="label" themeColor="textPrimary">
+                  국물도 드셨나요?
+                </ThemedText>
+                <View style={styles.soupOptions}>
+                  {[
+                    { id: true, label: '네' },
+                    { id: false, label: '아니요' },
+                  ].map((option) => {
+                    const active = hasSoup === option.id;
+                    return (
+                      <Pressable
+                        key={String(option.id)}
+                        onPress={() => setHasSoup((prev) => (prev === option.id ? undefined : option.id))}>
+                        <ThemedView
+                          type={active ? 'brand' : 'onboardingBackground'}
+                          style={styles.soupOption}>
+                          <ThemedText type="label" themeColor={active ? 'textOnBrand' : 'textMuted'}>
+                            {option.label}
+                          </ThemedText>
+                        </ThemedView>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </ThemedView>
+            ) : null}
           </>
         ) : loadError ? (
           <ThemedText type="bodyS" themeColor="textSecondary" style={styles.errorText}>
@@ -287,8 +300,21 @@ export default function FoodResultScreen() {
 
       <BottomButton
         label="확인"
-        disabled={!identify || !portion || !method || submitting}
+        disabled={!identify || !method || submitting}
         onPress={handleConfirm}
+        secondary={
+          resolvedFoodId
+            ? {
+                label: '다른 방법으로 먹어볼까요?',
+                variant: 'secondary',
+                onPress: () =>
+                  router.push({
+                    pathname: '/food/alternative',
+                    params: { food_id: String(resolvedFoodId) },
+                  }),
+              }
+            : undefined
+        }
       />
     </ThemedView>
   );
@@ -327,14 +353,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  photoIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  photoLabel: {},
   foodName: {
     fontSize: 22,
     lineHeight: 30,

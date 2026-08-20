@@ -125,7 +125,8 @@ export default function SymptomDetailScreen() {
     });
   };
 
-  const step1Ready = Boolean(onset && location);
+  /** location 은 POST /symptoms 계약상 선택값(optional)이라 진행 조건에 넣지 않는다 — onset 만 필수다 */
+  const step1Ready = Boolean(onset);
   const step2Ready = factors.length > 0;
 
   /**
@@ -150,7 +151,7 @@ export default function SymptomDetailScreen() {
   };
 
   const handleFinish = async () => {
-    if (!step2Ready || saving || !onset || !location) return;
+    if (!step2Ready || saving || !onset) return;
 
     setPostError(false);
     setSaving(true);

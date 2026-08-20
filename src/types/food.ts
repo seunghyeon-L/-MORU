@@ -79,7 +79,8 @@ export type MealIdentifyIngredient = {
 };
 
 export type MealIdentifyResponse = {
-  food_id: number;
+  /** 마스터에 없는(직접 입력) 음식이면 null — 그래도 ingredients 는 온다 */
+  food_id: number | null;
   food_name: string;
   has_broth: boolean;
   ingredients: MealIdentifyIngredient[];
@@ -141,35 +142,100 @@ export type Alternative = {
 };
 
 /* ------------------------------------------------------------------ */
-/* 대체 레시피 (food/alternative/recipe — H2)                           */
+/* H4 음식 기반 대체안 — GET /foods/{food_id}/alternatives 실제 API       */
+/* ingredient_ids 가 빈 배열이면 substitute 옵션을 화면에 표시하지 않는다.  */
 /* ------------------------------------------------------------------ */
 
-export type Recipe = {
-  id: string;
+export type FoodAlternativeOption =
+  | { kind: 'portion'; title: string; detail: string }
+  | { kind: 'omit'; title: string; detail: string }
+  | { kind: 'substitute'; title: string; detail: string; screen: string; ingredient_ids: number[] }
+  | { kind: 'menu'; title: string; detail: string; screen: string; food_id: number };
+
+export type FoodAlternativesResponse = {
+  food_name: string;
+  ingredients: string[];
+  options: FoodAlternativeOption[];
+};
+
+/* ------------------------------------------------------------------ */
+/* H3 성분 대체 방법 — GET /substitutions 실제 API                       */
+/* ------------------------------------------------------------------ */
+
+export type SubstitutionGroup = {
+  ingredient: string;
+  replacement: string;
+  alt?: string;
+};
+
+export type SubstitutionTip = {
+  seq: number;
   title: string;
-  ingredients: { name: string; amount: string }[];
+  detail: string;
+};
+
+export type SubstitutionRecipeLink = {
+  recipe_id: number;
+  title: string;
+  screen: string;
+};
+
+export type SubstitutionsResponse = {
+  intro: string;
+  groups: SubstitutionGroup[];
+  tips: SubstitutionTip[];
+  recipes: SubstitutionRecipeLink[];
+};
+
+/* ------------------------------------------------------------------ */
+/* 대체 레시피 (food/alternative/recipe — H2) — GET /recipes/{recipe_id} */
+/* ------------------------------------------------------------------ */
+
+export type RecipeItem = {
+  name: string;
+  amount: string;
+  optional: boolean;
+};
+
+export type RecipeDetail = {
+  title: string;
+  servings: string;
+  items: RecipeItem[];
   tip?: string;
 };
 
 /* ------------------------------------------------------------------ */
-/* 성분 대체 방법 (food/alternative/substitute — H3)                     */
+/* 대체 메뉴 제안 (food/alternative/menu — H5)                          */
+/* GET /foods/{food_id}/menu-alternatives 실제 API                     */
 /* ------------------------------------------------------------------ */
 
-export type IngredientSubstitution = {
-  id: string;
-  original: string;
-  substitute: string;
-  note?: string;
+export type MenuAlternativeItem = {
+  name: string;
+  why: string;
+  /**
+   * 기록용이 아니다 — H5 에서 H4 로 다시 들어갈 수 있을 때만 쓴다.
+   * null 이면 H4 진입 버튼을 숨긴다.
+   */
+  food_id?: number | null;
+};
+
+export type MenuAlternativesResponse = {
+  headline: string;
+  items: MenuAlternativeItem[];
+  has_more: boolean;
 };
 
 /* ------------------------------------------------------------------ */
-/* 대체 메뉴 제안 (food/alternative/menu — H5)                          */
+/* 추천 저장 — POST /saved (G '저장한 추천'에 쌓인다)                      */
 /* ------------------------------------------------------------------ */
 
-export type MenuSuggestion = {
-  id: string;
-  name: string;
-  description: string;
+export type SaveRecommendationRequest = {
+  kind: SavedRecommendationKind;
+  ref_id: number;
+};
+
+export type SaveRecommendationResponse = {
+  ok: boolean;
 };
 
 /* ------------------------------------------------------------------ */
@@ -196,15 +262,22 @@ export type ChatSendRequest = {
   text: string;
 };
 
+/**
+ * screen 은 확인된 값만 실제로 처리한다("D2", "H4").
+ * blocked 가 true 면 suggestions 는 오지 않는다.
+ */
+export type ChatSuggestion = {
+  label: string;
+  screen: string;
+  food_id?: number;
+  food_name?: string;
+};
+
 export type ChatSendResponse = {
   session_id: number;
   reply: string;
   blocked: boolean;
-  /**
-   * 항목 구조가 계약에 문서화되어 있지 않다(예시에도 항상 빈 배열).
-   * 내용을 해석·렌더링하지 않고 그대로 보존만 한다.
-   */
-  suggestions: unknown[];
+  suggestions: ChatSuggestion[];
 };
 
 /* ------------------------------------------------------------------ */
@@ -243,6 +316,8 @@ export type SavedRecommendation = {
   kind: SavedRecommendationKind;
   ref_id: number;
   title: string;
+  /** "H2"|"H3"|"H5" — 이 값 기준으로 진입 화면을 정한다(kind 로 재추론하지 않는다) */
+  screen: string;
 };
 
 export type MyTableResponse = {
