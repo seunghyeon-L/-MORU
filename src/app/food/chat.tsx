@@ -9,7 +9,8 @@ import { CloverIcon, DocumentIcon, RefreshIcon, SendArrowIcon } from '@/componen
 import { ChatBubble } from '@/components/food/ChatBubble';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme } from '@/hooks/use-theme';
+import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { Spacing } from '@/constants/theme';
 import * as api from '@/services/api';
 import type { ChatMessage, ChatSuggestion } from '@/types/food';
@@ -74,7 +75,8 @@ const STATIC_PROMPTS: StaticPrompt[] = [
  */
 export default function FoodChatScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const insets = useSafeAreaInsets();
+  const { inset: keyboardInset, onLayout } = useKeyboardInset();
   const theme = useTheme();
   const scrollRef = useRef<ScrollView>(null);
   // D1 "메뉴 검색"/"직접 입력"에서 들어온 경우에만 입력창 placeholder 를 음식 이름 기준으로 바꾼다
@@ -179,7 +181,10 @@ export default function FoodChatScreen() {
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ThemedView type="onboardingBackground" style={[styles.container, { paddingTop: insets.top }]}>
+      <ThemedView
+        type="onboardingBackground"
+        onLayout={onLayout}
+        style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.headerRow}>
           <BackButton />
           <ThemedText type="smallBold" themeColor="textPrimary">
@@ -257,7 +262,17 @@ export default function FoodChatScreen() {
           </View>
         </ScrollView>
 
-        <View style={[styles.inputRow, { paddingBottom: insets.bottom + Spacing.two }]}>
+        {/*
+          키보드가 올라오면 그만큼 입력창을 띄운다.
+          안드로이드 edge-to-edge 에서는 창이 안 줄어들어 입력창이 키보드 뒤에 깔렸다.
+          키보드가 떠 있는 동안에는 내비게이션 바 인셋을 더할 필요가 없다 —
+          그 자리를 키보드가 이미 덮고 있다.
+        */}
+        <View
+          style={[
+            styles.inputRow,
+            { paddingBottom: (keyboardInset || insets.bottom) + Spacing.two },
+          ]}>
           <ThemedView type="surfaceCard" style={styles.inputWrap}>
             <TextInput
               value={input}

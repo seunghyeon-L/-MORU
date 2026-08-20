@@ -17,6 +17,7 @@ import { OnboardingHeader } from '@/components/onboarding/OnboardingHeader';
 import { QuestionCard } from '@/components/onboarding/QuestionCard';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { useMoruData } from '@/hooks/useMoruData';
 import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
@@ -33,6 +34,7 @@ const FREQUENCY_DESCRIPTIONS: Record<SymptomFrequency, string> = {
 export default function OnboardingSymptomsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { inset: keyboardInset, onLayout } = useKeyboardInset();
   const theme = useTheme();
   const { updateOnboarding, completeOnboarding } = useMoruData();
 
@@ -98,6 +100,7 @@ export default function OnboardingSymptomsScreen() {
       style={styles.keyboardAvoider}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
+        onLayout={onLayout}
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -105,7 +108,12 @@ export default function OnboardingSymptomsScreen() {
         contentInsetAdjustmentBehavior="never">
         <ThemedView
           type="onboardingBackground"
-          style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom + 16 }]}>
+          style={[
+            styles.container,
+            // 키보드가 떠 있으면 그만큼 밀어 올린다. 그 자리는 키보드가 이미 덮고 있어서
+            // 내비게이션 바 인셋을 같이 더할 필요가 없다.
+            { paddingTop: insets.top, paddingBottom: (keyboardInset || insets.bottom) + 16 },
+          ]}>
           <View style={styles.content}>
             <OnboardingHeader step={4} />
 

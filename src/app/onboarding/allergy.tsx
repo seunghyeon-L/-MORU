@@ -17,6 +17,7 @@ import { OnboardingHeader } from '@/components/onboarding/OnboardingHeader';
 import { QuestionCard } from '@/components/onboarding/QuestionCard';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useKeyboardInset } from '@/hooks/use-keyboard-inset';
 import { useMoruData } from '@/hooks/useMoruData';
 import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
@@ -41,6 +42,7 @@ function nextAllergies(prev: readonly Allergy[], id: Allergy): Allergy[] {
 export default function AllergyScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { inset: keyboardInset, onLayout } = useKeyboardInset();
   const theme = useTheme();
   const { updateOnboarding } = useMoruData();
 
@@ -98,8 +100,10 @@ export default function AllergyScreen() {
         키보드 닫기로 삼켜서 '다음' 의 onPress 가 아예 호출되지 않는다.
         사용자에게는 눌러도 반응이 없는 화면으로 보인다.
       - iOS 는 키보드가 올라와도 레이아웃을 줄이지 않아 '다음' 이 키보드 뒤에 깔린다.
-        안드로이드는 expo 기본값(softwareKeyboardLayoutMode: 'resize')이 창을 줄여주므로
-        behavior 를 주면 이중으로 밀린다. 그래서 iOS 에만 준다.
+        안드로이드도 마찬가지인 경우가 있다 — expo 기본값이 'resize' 라 창이 줄어들 것 같지만,
+        SDK 54 의 edge-to-edge 에서는 IME 가 창을 안 줄이고 inset 으로만 오기도 한다.
+        실제로 갤럭시 챗봇 화면에서 입력칸이 키보드 뒤에 깔렸다.
+        기기마다 다르므로 useKeyboardInset 이 창이 실제로 줄었는지 재서 모자란 만큼만 채운다.
 
       contentInsetAdjustmentBehavior 는 키보드와 별개다.
       react-native-screens 가 화면의 첫 ScrollView 를 'automatic' 으로 덮어쓰는데,
@@ -110,6 +114,7 @@ export default function AllergyScreen() {
       style={styles.keyboardAvoider}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
+        onLayout={onLayout}
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -117,7 +122,12 @@ export default function AllergyScreen() {
         contentInsetAdjustmentBehavior="never">
         <ThemedView
           type="onboardingBackground"
-          style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom + 16 }]}>
+          style={[
+            styles.container,
+            // 키보드가 떠 있으면 그만큼 밀어 올린다. 그 자리는 키보드가 이미 덮고 있어서
+            // 내비게이션 바 인셋을 같이 더할 필요가 없다.
+            { paddingTop: insets.top, paddingBottom: (keyboardInset || insets.bottom) + 16 },
+          ]}>
           <View style={styles.content}>
             <OnboardingHeader step={2} />
 
