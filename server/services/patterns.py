@@ -22,7 +22,8 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from models import (
-    Ingredient, Meal, MealFodmap, MealIngredient, SymptomContext, SymptomLog, User,
+    Ingredient, Meal, MealFodmap, MealIngredient, SymptomContext, SymptomDetail,
+    SymptomLog, User,
 )
 from services import fodmap
 from services.text import w
@@ -36,12 +37,18 @@ MAX_ESTIMATED = 0.5    # 추정으로 때운 비율의 상한
 LOOKBACK_DAYS = 30
 KST = timezone(timedelta(hours=9))
 
+# 화면에서 고를 수 있는 상황 요인. 키는 프론트와 맞춘 값이다.
+# ★ 라벨이 아니라 키로 저장해야 한다.
+#   "잠을 적게 잤어요" 를 그대로 저장하면 문장에 끼울 때
+#   "잠을 적게 잤어요가 겹친 날이 많아서" 처럼 깨진다.
 CONTEXT_KO = {
     "short_sleep": "수면 5시간 이하",
     "high_stress": "스트레스 높음",
     "overeating": "평소보다 많이 먹음",
     "alcohol": "음주",
     "menstruation": "월경 기간",
+    "irregular_meal": "불규칙한 식사",
+    "busy_schedule": "바쁜 일정",
 }
 
 
@@ -58,9 +65,15 @@ def _symptom_hit(db: Session, user_id: int, meal: Meal, axis: str) -> SymptomLog
     t0, _, _, t3 = fodmap.CURVE[axis]
     lo = meal.eaten_at + timedelta(hours=t0)
     hi = meal.eaten_at + timedelta(hours=t3)
+    # ★ "오늘은 괜찮았어요" 기록(강도만 남기고 증상은 없음)은 세지 않는다.
+    #   E0 강도 체크에서 낮게 고르면 그 자리에서 기록이 끝나는데,
+    #   그걸 불편함으로 세면 멀쩡한 날이 반응으로 잡힌다.
+    #   실제로 불편함이 있었다고 표시된 것만 본다.
     return (db.query(SymptomLog)
+            .join(SymptomDetail, SymptomDetail.symptom_log_id == SymptomLog.id)
             .filter(SymptomLog.user_id == user_id,
-                    SymptomLog.onset_at >= lo, SymptomLog.onset_at <= hi)
+                    SymptomLog.onset_at >= lo, SymptomLog.onset_at <= hi,
+                    SymptomDetail.level.in_(("mild", "strong")))
             .order_by(SymptomLog.onset_at).first())
 
 

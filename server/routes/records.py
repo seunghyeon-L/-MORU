@@ -5,7 +5,7 @@
 """
 
 import base64
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -302,3 +302,88 @@ async def resolve_symptom(log_id: int, body: ResolveIn, dev: str = Depends(devic
         log.resolved_at = body.resolved_at
         db.commit()
     return {"ok": True}
+
+
+# ── 기록 목록 ──────────────────────────────────
+
+_PORTION_KO = {"half": "반 그릇", "one": "한 그릇", "one_and_half_plus": "한 그릇 반 이상"}
+_LEVEL_KO = {"none": "없음", "mild": "조금", "strong": "많이"}
+_LOCATION_KO = {"upper": "윗배", "lower": "아랫배"}
+_ONSET_KO = {"just_now": "방금", "about_1h": "1시간쯤 전",
+             "since_morning": "오전부터", "since_yesterday": "어제부터"}
+KST = timezone(timedelta(hours=9))
+
+
+@router.get(
+    "/records",
+    summary="기록 메인 — 내가 남긴 식사·증상 목록",
+    responses=ex({
+        "days": 14,
+        "meals": [{
+            "id": 91, "food_id": 3, "food_name": "김치찌개",
+            "eaten_at": "2026-08-19T12:30:00+09:00",
+            "method": "photo", "portion": "one",
+            "summary": "한 그릇 · 국물까지", "has_insight": True,
+        }],
+        "symptoms": [{
+            "id": 44,
+            "logged_at": "2026-08-19T18:10:00+09:00",
+            "onset_at": "2026-08-19T17:10:00+09:00",
+            "resolved_at": None,
+            "summary": "배가 빵빵함 많이",
+            "detail": "1시간쯤 전 · 아랫배",
+            "contexts": ["수면 5시간 이하"],
+        }],
+    }),
+)
+async def records(days: int = 14, dev: str = Depends(device_id),
+                  db: Session = Depends(get_db)):
+    """기록 메인 화면이 쓰는 목록.
+
+    문구는 서버가 만들어 보낸다. 프론트가 "한 그릇 · 국물까지" 같은 문장을
+    조립하면 조사·표기가 화면마다 갈린다.
+    """
+    u = users.get_or_create(db, dev)
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+
+    meals = []
+    for m in (db.query(Meal)
+              .filter(Meal.user_id == u.id, Meal.eaten_at >= since)
+              .order_by(Meal.eaten_at.desc()).all()):
+        bits = [_PORTION_KO.get(m.portion, "")]
+        if m.ate_broth is True:
+            bits.append("국물까지")
+        elif m.ate_broth is False:
+            bits.append("건더기만")
+        meals.append({
+            "id": m.id, "food_id": m.food_id, "food_name": m.food_name,
+            "eaten_at": m.eaten_at.astimezone(KST).isoformat(),
+            "method": m.method, "portion": m.portion,
+            "summary": " · ".join(b for b in bits if b),
+            "has_insight": m.fodmap_computed_at is not None,
+        })
+
+    symptoms = []
+    for s in (db.query(SymptomLog)
+              .filter(SymptomLog.user_id == u.id, SymptomLog.onset_at >= since)
+              .order_by(SymptomLog.onset_at.desc()).all()):
+        det = db.query(SymptomDetail).filter(SymptomDetail.symptom_log_id == s.id).all()
+        parts = [f"{d.kind} {_LEVEL_KO.get(d.level, '')}".strip()
+                 for d in det if d.level != "none"]
+        ctx = [patterns.CONTEXT_KO.get(c.factor, c.factor)
+               for c in db.query(SymptomContext)
+               .filter(SymptomContext.symptom_log_id == s.id) if c.factor != "none"]
+        sub = [_ONSET_KO.get(s.onset, "")]
+        if s.location:
+            sub.append(_LOCATION_KO[s.location])
+        symptoms.append({
+            "id": s.id,
+            "logged_at": s.logged_at.astimezone(KST).isoformat() if s.logged_at else None,
+            "onset_at": s.onset_at.astimezone(KST).isoformat(),
+            "resolved_at": s.resolved_at.astimezone(KST).isoformat() if s.resolved_at else None,
+            "summary": ", ".join(parts) if parts else "불편함 없음",
+            "detail": " · ".join(b for b in sub if b),
+            "contexts": ctx,
+        })
+
+    return {"days": days, "meals": meals, "symptoms": symptoms}
