@@ -1,0 +1,358 @@
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { CameraIcon, ChevronRightIcon, PulseIcon, SmilePlusIcon } from '@/components/common/icons';
+import { FoodInputSheet } from '@/components/food/FoodInputSheet';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { useMoruData } from '@/hooks/useMoruData';
+import { useTheme } from '@/hooks/use-theme';
+import { BottomTabInset, Spacing } from '@/constants/theme';
+import { PORTION_OPTIONS } from '@/types/food';
+import { OVERALL_STATE_OPTIONS, SYMPTOM_TYPE_OPTIONS, type Severity } from '@/types/symptom';
+
+/**
+ * 탭 화면 콘텐츠 맨 아래에서 하단 탭바가 먹는 높이. 자세한 근거는 (tabs)/index.tsx 의 같은 상수 주석 참고.
+ * 요약: 탭 화면의 레이아웃 높이는 세 플랫폼 모두 "탭바를 포함한 전체 높이"인데,
+ * 안드로이드만 실제 콘텐츠 영역이 탭바 위에서 끝나서(TabsHost.kt 의 세로 LinearLayout)
+ * 아래쪽이 잘린다. iOS·웹은 탭바가 덮는다. 어느 쪽이든 이만큼은 비워 둬야 한다.
+ */
+
+/** severity 1~9 → "조금/보통/많이" 3단계 표현 (E0 화면과 동일한 문구 사용) */
+function severityLabel(severity: Severity): string {
+  if (severity <= 3) return '조금';
+  if (severity <= 6) return '보통';
+  return '많이';
+}
+
+function formatDay(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diffDays = Math.round((startOf(now) - startOf(date)) / 86400000);
+  if (diffDays === 0) return '오늘';
+  if (diffDays === 1) return '어제';
+  return `${date.getMonth() + 1}월 ${date.getDate()}일`;
+}
+
+function formatTime(iso: string): string {
+  const date = new Date(iso);
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+type RecentItem = {
+  id: string;
+  time: number;
+  day: string;
+  clock: string;
+  title: string;
+  badge: string;
+};
+
+/**
+ * 기록 메인 (Figma "기록 메인 v2").
+ * 빠른 기록 진입, 오늘의 상태, 최근 기록을 한 화면에서 보여준다.
+ */
+export default function RecordScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const theme = useTheme();
+  const { records } = useMoruData();
+  const [foodSheetVisible, setFoodSheetVisible] = useState(false);
+
+  // 제목·부제는 서버가 만들어 보낸 문구를 그대로 쓴다.
+  // 화면마다 조립하면 "반 그릇 · 국물까지" 같은 표기가 갈린다.
+  const recentFoodItems: RecentItem[] = records.meals.map((m) => ({
+    id: `meal-${m.id}`,
+    time: new Date(m.eaten_at).getTime(),
+    day: formatDay(m.eaten_at),
+    clock: formatTime(m.eaten_at),
+    title: `${m.food_name} · ${m.summary}`,
+    badge: '음식',
+  }));
+
+  const recentSymptomItems: RecentItem[] = records.symptoms.map((s) => ({
+    id: `symptom-${s.id}`,
+    time: new Date(s.onset_at).getTime(),
+    day: formatDay(s.onset_at),
+    clock: formatTime(s.onset_at),
+    title: s.summary,
+    badge: '증상',
+  }));
+
+  const recentItems = [...recentFoodItems, ...recentSymptomItems]
+    .sort((a, b) => b.time - a.time)
+    .slice(0, 2);
+
+  const todaySymptom = records.symptoms.find((s) => formatDay(s.onset_at) === '오늘');
+  const todayStateLabel = todaySymptom ? todaySymptom.summary : undefined;
+
+  return (
+    <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+      <ThemedView
+        type="onboardingBackground"
+        style={[
+          styles.container,
+          {
+            paddingTop: insets.top + Spacing.three,
+            paddingBottom: insets.bottom + BottomTabInset + Spacing.three,
+          },
+        ]}>
+        <ThemedText type="h1" themeColor="textPrimary" style={styles.title}>
+          기록
+        </ThemedText>
+        <ThemedText type="bodyS" themeColor="textSecondary" style={styles.subtitle}>
+          오늘 먹은 것과 몸의 반응을 남겨보세요.
+        </ThemedText>
+
+        <ThemedText type="label" themeColor="textPrimary" style={styles.sectionLabel}>
+          빠르게 기록하기
+        </ThemedText>
+
+        <View style={styles.quickRow}>
+          {/* 음식 기록 → D1 입력 방식 선택 바텀시트를 연다 */}
+          <Pressable style={styles.quickCardPressable} onPress={() => setFoodSheetVisible(true)}>
+            {({ pressed }) => (
+            <ThemedView
+              type={pressed ? 'surfacePressed' : 'surfaceCard'}
+              style={styles.quickCard}>
+              <ThemedView type="brandLight" style={styles.quickIcon}>
+                <CameraIcon size={20} color={theme.brandText} />
+              </ThemedView>
+              <ThemedText type="label" themeColor="textPrimary" style={styles.quickTitle}>
+                음식 기록
+              </ThemedText>
+              <ThemedText type="caption" themeColor="textMuted">
+                사진이나 메뉴로 간단하게 남겨요
+              </ThemedText>
+            </ThemedView>
+            )}
+          </Pressable>
+
+          <Pressable style={styles.quickCardPressable} onPress={() => router.push('/symptom')}>
+            {({ pressed }) => (
+            <ThemedView
+              type={pressed ? 'surfacePressed' : 'surfaceCard'}
+              style={styles.quickCard}>
+              <ThemedView type="coralLight" style={styles.quickIcon}>
+                <PulseIcon size={20} color={theme.coral} />
+              </ThemedView>
+              <ThemedText type="label" themeColor="textPrimary" style={styles.quickTitle}>
+                증상 기록
+              </ThemedText>
+              <ThemedText type="caption" themeColor="textMuted">
+                불편했던 순간과 상황을 함께 남겨요
+              </ThemedText>
+            </ThemedView>
+            )}
+          </Pressable>
+        </View>
+
+        <Pressable onPress={() => router.push('/food/chat')}>
+          {({ pressed }) => (
+          <ThemedView
+            type={pressed ? 'elementPressed' : 'brandLighter'}
+            style={styles.aiCard}>
+            <ThemedView type="brand" style={styles.aiBadge}>
+              <ThemedText type="label" themeColor="textOnBrand">
+                AI
+              </ThemedText>
+            </ThemedView>
+            <View style={styles.aiTexts}>
+              <ThemedText type="label" themeColor="textPrimary">
+                AI에게 물어보기
+              </ThemedText>
+              <ThemedText type="caption" themeColor="textMuted">
+                먹기 전 고민되거나 기록이 궁금할 때 물어보세요.
+              </ThemedText>
+            </View>
+            <ChevronRightIcon size={18} color={theme.textMuted} />
+          </ThemedView>
+          )}
+        </Pressable>
+
+        <ThemedText type="label" themeColor="textPrimary" style={styles.sectionLabel}>
+          오늘의 상태
+        </ThemedText>
+
+        <ThemedView type="surfaceCard" style={styles.statusCard}>
+          <View style={styles.statusTexts}>
+            <ThemedText type="bodyS" themeColor="textPrimary">
+              {todayStateLabel ? `오늘 상태 · ${todayStateLabel}` : '오늘은 아직 상태를 기록하지 않았어요.'}
+            </ThemedText>
+            <Pressable onPress={() => router.push('/symptom')}>
+              <ThemedText type="label" themeColor="brandText">
+                {todayStateLabel ? '기록 다시 하기' : '지금 상태 남기기'}
+              </ThemedText>
+            </Pressable>
+          </View>
+          <Pressable onPress={() => router.push('/symptom')}>
+            <ThemedView type="brandSoft" style={styles.statusIcon}>
+              <SmilePlusIcon size={26} color={theme.brand} />
+            </ThemedView>
+          </Pressable>
+        </ThemedView>
+
+        <View style={styles.recentHeaderRow}>
+          <ThemedText type="label" themeColor="textPrimary">
+            최근 기록
+          </ThemedText>
+          <Pressable onPress={() => router.push('/analysis')}>
+            <ThemedText type="caption" themeColor="textMuted">
+              전체 보기
+            </ThemedText>
+          </Pressable>
+        </View>
+
+        {recentItems.length > 0 ? (
+          <ThemedView type="surfaceCard" style={styles.recentCard}>
+            {recentItems.map((item, index) => (
+              <View
+                key={item.id}
+                style={[
+                  styles.recentRow,
+                  index > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.borderSubtle },
+                ]}>
+                <ThemedText type="caption" themeColor="textMuted" style={styles.recentTime}>
+                  {`${item.day} ${item.clock}`}
+                </ThemedText>
+                <ThemedText type="label" themeColor="textPrimary" style={styles.recentTitle}>
+                  {item.title}
+                </ThemedText>
+                <ThemedText type="caption" themeColor="textMuted">
+                  {item.badge}
+                </ThemedText>
+              </View>
+            ))}
+          </ThemedView>
+        ) : null}
+      </ThemedView>
+
+      <FoodInputSheet visible={foodSheetVisible} onClose={() => setFoodSheetVisible(false)} />
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  container: {
+    flex: 1,
+    paddingHorizontal: Spacing.four,
+  },
+  title: {
+    fontSize: 28,
+    lineHeight: 36,
+  },
+  subtitle: {
+    marginTop: 8,
+  },
+  sectionLabel: {
+    marginTop: 32,
+    marginBottom: 12,
+  },
+  quickRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  quickCardPressable: {
+    flex: 1,
+  },
+  quickCard: {
+    borderRadius: 18,
+    padding: 18,
+    gap: 12,
+    shadowColor: '#3B332B',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.05,
+    shadowRadius: 14,
+    elevation: 1,
+  },
+  quickIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickTitle: {
+    marginTop: 2,
+  },
+  aiCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 18,
+    padding: 18,
+    marginTop: 14,
+  },
+  aiBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiTexts: {
+    flex: 1,
+    gap: 3,
+  },
+  statusCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 18,
+    padding: 18,
+    shadowColor: '#3B332B',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.05,
+    shadowRadius: 14,
+    elevation: 1,
+  },
+  statusTexts: {
+    flex: 1,
+    gap: 8,
+  },
+  statusIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 12,
+  },
+  recentHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 32,
+    marginBottom: 12,
+  },
+  recentCard: {
+    borderRadius: 18,
+    paddingHorizontal: 18,
+    shadowColor: '#3B332B',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.05,
+    shadowRadius: 14,
+    elevation: 1,
+  },
+  recentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 16,
+  },
+  recentTime: {
+    width: 68,
+  },
+  recentTitle: {
+    flex: 1,
+  },
+});
